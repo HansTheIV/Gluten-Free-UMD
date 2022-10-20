@@ -3,14 +3,24 @@ package com.example.umd_gluten_free
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,7 +32,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    Greeting("Android")
+                    Placeholder("Map")
+                    ScaffoldMenu()
+
                 }
             }
         }
@@ -30,14 +42,100 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Greeting(name: String) {
-    Text(text = "Hello $name!")
+fun Placeholder(component: String) {
+    Text(text = "$component goes here")
 }
 
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
     UMDGlutenFreeTheme {
-        Greeting("Android")
+        Placeholder("Android")
     }
+}
+
+@Composable
+fun TopBar(onMenuClicked: () -> Unit) {
+    TopAppBar(
+        title = {Text(text= "UMD Gluten Free", color=Color.White)},
+        navigationIcon = {
+            Icon(
+                imageVector = Icons.Default.Menu,
+                contentDescription = "Menu",
+
+                // When clicked trigger onClick
+                // Callback to trigger drawer open
+                modifier = Modifier.clickable(onClick = onMenuClicked),
+                tint = Color.White
+            )
+        },
+        backgroundColor = Color(0xFFe21833)
+    )
+}
+
+@Composable
+fun Drawer() {
+    Column(
+        Modifier
+            .background(Color.White)
+            .fillMaxSize()
+    ) {
+        // Repeat is a loop which
+        // takes count as argument
+        repeat(5) { item ->
+            Text(text = "Item number $item", modifier = Modifier.padding(8.dp), color = Color.Black)
+        }
+    }
+}
+
+@Composable
+fun DrawerBody() {
+    Column(
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        Text(text = "Body Content", color = Color(0xFF0F9D58))
+    }
+}
+
+@Composable
+fun ScaffoldMenu() {
+    // to set menu closed by default
+    val scaffoldState = rememberScaffoldState(rememberDrawerState(DrawerValue.Closed))
+    val coroutineScope = rememberCoroutineScope()
+
+    // Scaffold Composable
+    Scaffold(
+
+        // pass the scaffold state
+        scaffoldState = scaffoldState,
+
+        // pass the topbar we created
+        topBar = {
+            TopBar(
+                // When menu is clicked open the
+                // drawer in coroutine scope
+                onMenuClicked = {
+                    coroutineScope.launch {
+                        // to close use -> scaffoldState.drawerState.close()
+                        scaffoldState.drawerState.open()
+                    }
+                })
+        },
+
+
+        // Pass the body in
+        // content parameter
+        content = {
+            DrawerBody()
+        },
+
+        // pass the drawer
+        drawerContent = {
+            Drawer()
+        },
+    )
 }
