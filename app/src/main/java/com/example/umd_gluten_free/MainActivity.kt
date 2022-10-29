@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
+import com.google.maps.android.compose.GoogleMap
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -32,8 +33,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    Placeholder("Map")
+
                     ScaffoldMenu()
+
 
                 }
             }
@@ -68,6 +70,7 @@ fun TopBar(onMenuClicked: () -> Unit) {
                 modifier = Modifier.clickable(onClick = onMenuClicked),
                 tint = Color.White
             )
+            // A button to move map to user's location
         },
         backgroundColor = Color(0xFFe21833)
     )
@@ -77,9 +80,10 @@ fun TopBar(onMenuClicked: () -> Unit) {
 fun Drawer() {
     Column(
         Modifier
-            .background(Color.White)
+            //.background(Color.White)
             .fillMaxSize()
     ) {
+        // This will get a few buttons to open fragments or activities for our other screens
         // Repeat is a loop which
         // takes count as argument
         repeat(5) { item ->
@@ -95,9 +99,8 @@ fun DrawerBody() {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
     ) {
-        Text(text = "Body Content", color = Color(0xFF0F9D58))
+        GoogleMap()
     }
 }
 
@@ -112,7 +115,7 @@ fun ScaffoldMenu() {
 
         // pass the scaffold state
         scaffoldState = scaffoldState,
-
+        drawerGesturesEnabled = scaffoldState.drawerState.isOpen,
         // pass the topbar we created
         topBar = {
             TopBar(
@@ -138,4 +141,10 @@ fun ScaffoldMenu() {
             Drawer()
         },
     )
+}
+
+
+@Composable
+fun MapScreen() {
+    GoogleMap()
 }
