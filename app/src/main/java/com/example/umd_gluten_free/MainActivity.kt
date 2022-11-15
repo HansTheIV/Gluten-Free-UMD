@@ -60,17 +60,40 @@ fun AppNavHost(
 ) {
     NavHost(modifier=modifier, navController=navController, startDestination=startDestination) {
         composable("settingsScreen") { SettingsScreen() }
-
+        composable("listScreen") { ListScreen() }
+        composable("submitNewFood") { SubmitScreen() }
         composable("mapScreen") {
-            MapScreen(onNavigateToSettings = {
-                navController.navigate("settingsScreen") {
-                    popUpTo("mapScreen")
+            MapScreen(
+                onNavigateToSettings = {
+                    navController.navigate("settingsScreen") {
+                        popUpTo("mapScreen")
+                    }
+                },
+                onNavigateToList = {
+                    navController.navigate("listScreen")
+                },
+                onNavigateToSubmit = {
+                    navController.navigate("submitNewFood")
+                },
+                onNavigateToMap = {
+                    navController.navigate("mapScreen")
                 }
-            })
+
+            )
         }
 
 
     }
+}
+
+@Composable
+fun SubmitScreen() {
+    Placeholder(component = "Form submission")
+}
+
+@Composable
+fun ListScreen() {
+    Placeholder(component = "List View")
 }
 
 @Composable
@@ -107,7 +130,10 @@ fun TopBar(onMenuClicked: () -> Unit) {
 
 @Composable
 fun Drawer(
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToList: () -> Unit,
+    onNavigateToSubmit: () -> Unit,
+    onNavigateToMap: () -> Unit
 ) {
     Column(
         Modifier.fillMaxSize()
@@ -116,7 +142,14 @@ fun Drawer(
         // user's fingers
         Text("Logo goes here")
         // This will get a few buttons to open fragments or activities for our other screens
-        Button(onClick=onNavigateToSettings) {Text("Settings")}
+
+        Button(onClick = onNavigateToSubmit) {Text("Submit New Meal")}
+        Button(onClick = onNavigateToMap) {Text("Map View")}
+        Button(onClick = onNavigateToList) {Text("List View")}
+        Button(onClick = onNavigateToSettings) {Text("Settings")}
+
+
+
 
     }
 }
@@ -135,7 +168,10 @@ fun DrawerBody() {
 
 @Composable
 fun MapScreen(
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToList: () -> Unit,
+    onNavigateToSubmit: () -> Unit,
+    onNavigateToMap: () -> Unit
 ) {
     // to set menu closed by default
     val scaffoldState = rememberScaffoldState(rememberDrawerState(DrawerValue.Closed))
@@ -169,7 +205,12 @@ fun MapScreen(
 
         // pass the drawer
         drawerContent = {
-            Drawer(onNavigateToSettings = onNavigateToSettings)
+            Drawer(
+                onNavigateToSettings = onNavigateToSettings,
+                onNavigateToList = onNavigateToList,
+                onNavigateToSubmit = onNavigateToSubmit,
+                onNavigateToMap = onNavigateToMap
+            )
         },
     )
 }
