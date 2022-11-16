@@ -29,6 +29,10 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.maps.android.compose.CameraPositionState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 
 
 class MainActivity : ComponentActivity() {
@@ -140,17 +144,30 @@ fun Drawer(
     ) {
         //first we want a logo or something so we can put the buttons closer to the
         // user's fingers
-        Text("Logo goes here")
+        val alignToCenter = Modifier.align(Alignment.CenterHorizontally)
+        Image(
+            painter = painterResource(id = R.drawable.ic_gluten_free_logo),
+            contentDescription = "",
+            modifier = alignToCenter.size(200.dp)
+        )
         // This will get a few buttons to open fragments or activities for our other screens
 
-        Button(onClick = onNavigateToSubmit) {Text("Submit New Meal")}
-        Button(onClick = onNavigateToMap) {Text("Map View")}
-        Button(onClick = onNavigateToList) {Text("List View")}
-        Button(onClick = onNavigateToSettings) {Text("Settings")}
-
-
-
-
+        Button(
+            onClick = onNavigateToSubmit,
+            modifier = alignToCenter
+        ) {Text("Submit New Meal")}
+        Button(
+            onClick = onNavigateToMap,
+            modifier = alignToCenter
+        ) {Text("Map View")}
+        Button(
+            onClick = onNavigateToList,
+            modifier = alignToCenter
+        ) {Text("List View")}
+        Button(
+            onClick = onNavigateToSettings,
+            modifier = alignToCenter
+            ) {Text("Settings")}
     }
 }
 
