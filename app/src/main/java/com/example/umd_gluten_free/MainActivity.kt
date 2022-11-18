@@ -35,6 +35,12 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.DataOutputStream
+import java.io.InputStreamReader
+import java.net.URL
+import java.security.MessageDigest
 
 
 class MainActivity : ComponentActivity() {
@@ -148,12 +154,88 @@ fun LoginScreen(
     onNavigateToForgotPass: () -> Unit,
     onNavigateToSignup: () -> Unit
 ) {
-    fun submitLoginAttempt(username: String, password: String) {
-        // magic!
+    fun hashPassword(clearPassword: String): String {
+        val digest = MessageDigest.getInstance("SHA-1")
+        val bytes = digest.digest(clearPassword.toByteArray(Charsets.UTF_8))
+        val hashedPassword = StringBuilder()
+        for (byte in bytes) {
+            hashedPassword.append(String.format("%02X", byte))
+        }
+        return hashedPassword.toString()
     }
-    fun submitSignupAttempt(username: String, password: String, email: String) {
+    fun submitLoginAttempt(username: String, password: String): String {
+
+        // magic! And by magic, I mean we're going to send an http request to our API asking for a user token
+        // using a hashed password and username as a bargaining chip
+        val postData = String.format("user=%s&pass=%s", username, hashPassword(password))
+        val url = URL("google.com") //TODO this wont be our endpoint.
+        // Google is not gonna give us a user token.
+
+        val connection = url.openConnection()
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+        connection.setRequestProperty("Content-Length", postData.length.toString())
+        // write to connection
+        DataOutputStream(connection.getOutputStream()).use {
+            it.writeBytes(postData)
+        }
+        //read response
+        var responseBuilder = StringBuilder()
+        BufferedReader(InputStreamReader(connection.getInputStream())) .use { response ->
+            var line: String?
+            while (response.readLine().also { line = it } != null) {
+                responseBuilder.append(line)
+            }
+        }
+
+        val responseJSON = JSONObject(responseBuilder.toString())
+
+        if(responseJSON["status"].toString() != "200") {
+            // Something went wrong.
+            // More error handling in here please :)
+            //TODO
+        }
+        else {
+            return responseJSON["token"].toString()
+        }
+        return ""
+    }
+    fun submitSignupAttempt(username: String, password: String, isVegetarian: Boolean): String {
+        val postData = String.format("user=%s&pass=%s&veg=%b", username, hashPassword(password), isVegetarian);
+        val url = URL("google.com") //TODO this will not be our endpoint.
+        // Google is not gonna give us a user token.
+
+        val connection = url.openConnection()
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+        connection.setRequestProperty("Content-Length", postData.length.toString())
+        // write to connection
+        DataOutputStream(connection.getOutputStream()).use {
+            it.writeBytes(postData)
+        }
+        //read response
+        var responseBuilder = StringBuilder()
+        BufferedReader(InputStreamReader(connection.getInputStream())) .use { response ->
+            var line: String?
+            while (response.readLine().also { line = it } != null) {
+                responseBuilder.append(line)
+            }
+        }
+
+        val responseJSON = JSONObject(responseBuilder.toString())
+
+        if(responseJSON["status"].toString() != "200") {
+            // Something went wrong.
+            // More error handling in here please :)
+            //TODO
+        }
+        else {
+            return responseJSON["token"].toString()
+        }
+        return ""
         // more magic!!
     }
+
 
     Box(modifier = Modifier.fillMaxSize()) {
 
