@@ -108,7 +108,42 @@ fun AppNavHost(
 // Top level screens
 @Composable
 fun SubmitScreen() {
-    Placeholder(component = "Form submission")
+    fun submitMeal(mealName:String, locationName: String, vegetarian: Boolean, rating: Int) {
+        // trust and believe!
+    }
+
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        val centered = Modifier.align(Alignment.CenterHorizontally)
+        val mealName = remember { mutableStateOf(TextFieldValue()) }
+        val mealLocation = remember { mutableStateOf(TextFieldValue()) }
+        val rating = remember { mutableStateOf(0) }
+        val isVegan = remember { mutableStateOf(true) }
+        Spacer(modifier = Modifier.height(80.dp))
+        TextField(
+            label = { Text(text = "What did you eat?") },
+            value = mealName.value,
+            onValueChange = { mealName.value = it },
+            modifier = centered)
+
+        Spacer(modifier = Modifier.height(20.dp))
+        TextField(
+            label = {Text("Where did you eat it?")},
+            value = mealLocation.value,
+            onValueChange = {mealLocation.value= it},
+            modifier = centered)
+        Spacer(modifier = Modifier.height(20.dp))
+        Text("Vegan?", modifier = centered)
+        Checkbox(checked = isVegan.value, onCheckedChange = {isVegan.value = it}, modifier = centered)
+        Spacer(modifier = Modifier.height(30.dp))
+        Button(
+            onClick = {submitMeal(mealName.value.toString(), mealLocation.value.toString(), isVegan.value, rating.value)},
+            modifier = centered,
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
+        ) {
+            Text("Submit Meal", color = Color.White)
+        }
+    }
 }
 
 @Composable
@@ -200,8 +235,8 @@ fun LoginScreen(
         }
         return ""
     }
-    fun submitSignupAttempt(username: String, password: String, isVegetarian: Boolean): String {
-        val postData = String.format("user=%s&pass=%s&veg=%b", username, hashPassword(password), isVegetarian);
+    fun submitSignupAttempt(username: String, password: String, isVegan: Boolean): String {
+        val postData = String.format("user=%s&pass=%s&veg=%b", username, hashPassword(password), isVegan);
         val url = URL("google.com") //TODO this will not be our endpoint.
         // Google is not gonna give us a user token.
 
