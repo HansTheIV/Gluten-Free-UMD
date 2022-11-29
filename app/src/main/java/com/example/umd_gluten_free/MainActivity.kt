@@ -74,12 +74,12 @@ fun AppNavHost(
         composable("settingsScreen") { SettingsScreen(navController) }
         composable("listScreen") { ListScreen() }
         composable("submitNewFood") { SubmitScreen() }
-        composable("forgotPassword") {ForgotPasswordScreen()}
-        composable("signupScreen") {SignupScreen()}
+        composable("forgotPassword") { ForgotPasswordScreen() }
+        composable("signupScreen") { SignupScreen() }
         composable("loginScreen") {
             LoginScreen(
-                onNavigateToForgotPass = {navController.navigate("forgotPassword")},
-                onNavigateToSignup = {navController.navigate("signupScreen")}
+                onNavigateToForgotPass = { navController.navigate("forgotPassword") },
+                onNavigateToSignup = { navController.navigate("signupScreen") }
             )
         }
         composable("mapScreen") {
