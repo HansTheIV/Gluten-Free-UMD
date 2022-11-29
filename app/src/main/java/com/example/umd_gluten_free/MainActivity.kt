@@ -11,10 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,8 +39,13 @@ import java.io.InputStreamReader
 import java.net.URL
 import java.security.MessageDigest
 
+data class UIState(
+    val email: String = "",
+    val password: String = ""
+)
 
 class MainActivity : ComponentActivity() {
+    var currentUIState = mutableStateOf(UIState())
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -54,7 +56,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colors.background
                 ) {
 
-                    AppNavHost()
+                    AppNavHost(uiState = currentUIState)
 
 
                 }
@@ -66,6 +68,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavHost(
+    uiState: MutableState<UIState>,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startDestination: String = "mapScreen"
@@ -73,13 +76,14 @@ fun AppNavHost(
     NavHost(modifier=modifier, navController=navController, startDestination=startDestination) {
         composable("settingsScreen") { SettingsScreen(navController) }
         composable("listScreen") { ListScreen() }
-        composable("submitNewFood") { SubmitScreen() }
+        composable("submitNewFood") { SubmitScreen(uiState) }
         composable("forgotPassword") { ForgotPasswordScreen() }
         composable("signupScreen") { SignupScreen() }
         composable("loginScreen") {
             LoginScreen(
                 onNavigateToForgotPass = { navController.navigate("forgotPassword") },
-                onNavigateToSignup = { navController.navigate("signupScreen") }
+                onNavigateToSignup = { navController.navigate("signupScreen") },
+                uiState = uiState
             )
         }
         composable("mapScreen") {
@@ -107,41 +111,58 @@ fun AppNavHost(
 }
 // Top level screens
 @Composable
-fun SubmitScreen() {
-    fun submitMeal(mealName:String, locationName: String, vegetarian: Boolean, rating: Int) {
-        // trust and believe!
+fun SubmitScreen(UIState: MutableState<UIState>) {
+    fun submitMeal(mealName: String, locationName: String, vegetarian: Boolean, rating: Int) {
+
+        // otherwise, continue submitting
     }
+    if (UIState.value.email == "" || UIState.value.password == "") {
+        // Cannot submit if not logged in
+    }
+    else {
+        Column(modifier = Modifier.fillMaxSize()) {
+            val centered = Modifier.align(Alignment.CenterHorizontally)
+            val mealName = remember { mutableStateOf(TextFieldValue()) }
+            val mealLocation = remember { mutableStateOf(TextFieldValue()) }
+            val rating = remember { mutableStateOf(0) }
+            val isVegan = remember { mutableStateOf(true) }
+            Spacer(modifier = Modifier.height(80.dp))
+            TextField(
+                label = { Text(text = "What did you eat?") },
+                value = mealName.value,
+                onValueChange = { mealName.value = it },
+                modifier = centered
+            )
 
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        val centered = Modifier.align(Alignment.CenterHorizontally)
-        val mealName = remember { mutableStateOf(TextFieldValue()) }
-        val mealLocation = remember { mutableStateOf(TextFieldValue()) }
-        val rating = remember { mutableStateOf(0) }
-        val isVegan = remember { mutableStateOf(true) }
-        Spacer(modifier = Modifier.height(80.dp))
-        TextField(
-            label = { Text(text = "What did you eat?") },
-            value = mealName.value,
-            onValueChange = { mealName.value = it },
-            modifier = centered)
-
-        Spacer(modifier = Modifier.height(20.dp))
-        TextField(
-            label = {Text("Where did you eat it?")},
-            value = mealLocation.value,
-            onValueChange = {mealLocation.value= it},
-            modifier = centered)
-        Spacer(modifier = Modifier.height(20.dp))
-        Text("Vegan?", modifier = centered)
-        Checkbox(checked = isVegan.value, onCheckedChange = {isVegan.value = it}, modifier = centered)
-        Spacer(modifier = Modifier.height(30.dp))
-        Button(
-            onClick = {submitMeal(mealName.value.toString(), mealLocation.value.toString(), isVegan.value, rating.value)},
-            modifier = centered,
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
-        ) {
-            Text("Submit Meal", color = Color.White)
+            Spacer(modifier = Modifier.height(20.dp))
+            TextField(
+                label = { Text("Where did you eat it?") },
+                value = mealLocation.value,
+                onValueChange = { mealLocation.value = it },
+                modifier = centered
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("Vegan?", modifier = centered)
+            Checkbox(
+                checked = isVegan.value,
+                onCheckedChange = { isVegan.value = it },
+                modifier = centered
+            )
+            Spacer(modifier = Modifier.height(30.dp))
+            Button(
+                onClick = {
+                    submitMeal(
+                        mealName.value.toString(),
+                        mealLocation.value.toString(),
+                        isVegan.value,
+                        rating.value
+                    )
+                },
+                modifier = centered,
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
+            ) {
+                Text("Submit Meal", color = Color.White)
+            }
         }
     }
 }
@@ -187,8 +208,12 @@ fun ForgotPasswordScreen() {
 @Composable
 fun LoginScreen(
     onNavigateToForgotPass: () -> Unit,
-    onNavigateToSignup: () -> Unit
+    onNavigateToSignup: () -> Unit,
+    uiState: MutableState<UIState>
 ) {
+
+
+
     fun hashPassword(clearPassword: String): String {
         val digest = MessageDigest.getInstance("SHA-1")
         val bytes = digest.digest(clearPassword.toByteArray(Charsets.UTF_8))
