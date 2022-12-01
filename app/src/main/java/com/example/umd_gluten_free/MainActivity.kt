@@ -32,30 +32,19 @@ import androidx.navigation.compose.rememberNavController
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.tasks.RuntimeExecutionException
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import kotlinx.coroutines.launch
-import java.util.*
 
-data class UIState(
-    val email: String = "",
-    val userID: String = "",
-    val isLoggedIn: Boolean = false,
-    val isVegan: Boolean = false
-)
 
 class MainActivity : ComponentActivity() {
     private lateinit var auth: FirebaseAuth
-    private lateinit var currentUIState: MutableState<UIState>
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         auth = Firebase.auth
-        currentUIState = mutableStateOf(UIState())
         setContent {
             UMDGlutenFreeTheme {
                 // A surface container using the 'background' color from the theme
@@ -64,7 +53,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colors.background
                 ) {
 
-                    AppNavHost(uiState = currentUIState, auth = auth)
+                    AppNavHost(auth = auth)
 
 
                 }
@@ -76,29 +65,26 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavHost(
-    uiState: MutableState<UIState>,
     auth: FirebaseAuth,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startDestination: String = "mapScreen"
 ) {
     NavHost(modifier=modifier, navController=navController, startDestination=startDestination) {
-        composable("settingsScreen") { AccountManagementScreen(navController, uiState = uiState) }
+        composable("settingsScreen") { AccountManagementScreen(navController = navController, auth = auth ) }
         composable("listScreen") { ListScreen() }
-        composable("submitNewFood") { SubmitScreen(uiState) }
+        composable("submitNewFood") { SubmitScreen(auth = auth) }
         composable("forgotPassword") { ForgotPasswordScreen(auth = auth) }
         composable("signupScreen") { SignupScreen(
                                                 navController = navController,
                                                 context = LocalContext.current,
-                                                uiState = uiState,
                                                 auth = auth
                                             )
                                         }
         composable("loginScreen") {
-            if(!uiState.value.isLoggedIn) {
+            if(auth.currentUser == null) {
                 LoginScreen(
                     navController = navController,
-                    uiState = uiState,
                     context = LocalContext.current,
                     auth = auth
                 )
@@ -107,7 +93,7 @@ fun AppNavHost(
                 //Screen to allow logout
                 Toast.makeText(LocalContext.current, "You are already logged in. Would you like to log out?", Toast.LENGTH_LONG).show()
                 LogoutScreen(
-                        uiState = uiState,
+                         auth = auth ,
                         navController = navController
                 )
             }
@@ -137,12 +123,12 @@ fun AppNavHost(
 }
 // Top level screens
 @Composable
-fun SubmitScreen(UIState: MutableState<UIState>) {
+fun SubmitScreen(auth: FirebaseAuth) {
     fun submitMeal(mealName: String, locationName: String, vegetarian: Boolean, rating: Int) {
 
         //this might work!
     }
-    if (!UIState.value.isLoggedIn) {
+    if (auth.currentUser == null) {
         // Cannot submit if not logged in, show error screen
     }
     else {
@@ -194,14 +180,14 @@ fun SubmitScreen(UIState: MutableState<UIState>) {
 }
 @Composable
 fun LogoutScreen(
-    uiState: MutableState<UIState>,
+    auth: FirebaseAuth,
     navController: NavHostController
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Button(modifier = Modifier.align(Alignment.CenterHorizontally),
             onClick = {
                 // erase current login
-                uiState.value = UIState()
+                auth.signOut()
                 navController.navigate("mapScreen")
             }) {
             Text(text = "Log out?")
@@ -218,16 +204,17 @@ fun ListScreen() {
 @Composable
 fun AccountManagementScreen(
     navController: NavHostController,
-    uiState: MutableState<UIState>
+    auth: FirebaseAuth
 ) {
-    if(uiState.value.isLoggedIn)
+    if(auth.currentUser != null)
     {
-        //allow user to change whether they are vegan, or to change their password
+        //allow user to change their password
         Column(modifier = Modifier.fillMaxSize()) {
 
         }
     }
     else {
+        // if not logged in, redirect to the login screen
         navController.navigate("loginScreen")
     }
 }
@@ -235,30 +222,18 @@ fun AccountManagementScreen(
 @Composable
 fun SignupScreen(
     navController: NavHostController,
-    uiState: MutableState<UIState>,
     context: Context,
     auth: FirebaseAuth
 ) {
-    fun encodeString(input:String): String{
-        val encoder = Base64.getEncoder()
-        return encoder.encodeToString(input.toByteArray())
-    }
-    fun submitSignupAttempt(email: String, password: String, isVegan: Boolean): Pair<Boolean, String> {
+    fun submitSignupAttempt(email: String, password: String, isVegan: Boolean) {
         fun onResult(exception: java.lang.Exception?) {
-            Toast.makeText(context, exception?.message, Toast.LENGTH_LONG)
+            Toast.makeText(context, exception?.message, Toast.LENGTH_LONG).show()
         }
-        //TODO store whether vegan at signup
-        var failed = false
         auth.createUserWithEmailAndPassword(email, password).addOnCompleteListener {
             onResult(it.exception)
-            failed = true
         }
-
-        if(auth.currentUser == null) {
-            return Pair(false, "")
-        }
-        uiState.value = UIState(email, auth.currentUser?.uid!!, true, isVegan)
-        return Pair(true, uiState.value.userID)
+        // user is now either signed in, or the sign up failed. If the signup failed, it should
+        // display the error as a Toast
     }
 
     Column(
@@ -288,13 +263,13 @@ fun SignupScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
         Text(modifier = Modifier.align(Alignment.CenterHorizontally), text = "Vegan?")
-        Switch(modifier = Modifier.align(Alignment.CenterHorizontally), checked = vegan.value, onCheckedChange = {vegan.value = it});
+        Switch(modifier = Modifier.align(Alignment.CenterHorizontally), checked = vegan.value, onCheckedChange = {vegan.value = it})
         Spacer(modifier = Modifier.height(20.dp))
         Box(modifier = Modifier.padding(40.dp, 0.dp, 40.dp, 0.dp)) {
             Button(
                 onClick = {
-                            val result = submitSignupAttempt(email.value.toString(), password.value.toString(), vegan.value)
-                            if(result.first) {
+                            submitSignupAttempt(email.value.toString(), password.value.toString(), vegan.value)
+                            if(auth.currentUser != null) {
                                 //if signup is successful, they are logged in and so we route them back to map screen.
                                 navController.navigate("mapScreen")
                             }
@@ -322,23 +297,19 @@ fun ForgotPasswordScreen(auth: FirebaseAuth) {
 @Composable
 fun LoginScreen(
     navController: NavHostController,
-    uiState: MutableState<UIState>,
     context: Context,
     auth: FirebaseAuth
 ) {
 
     fun submitLoginAttempt(email: String, password: String) {
         fun onResult(exception: java.lang.Exception?) {
-            Toast.makeText(context, exception?.message, Toast.LENGTH_LONG)
+            Toast.makeText(context, exception?.message, Toast.LENGTH_LONG).show()
         }
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener {
                 onResult(it.exception)
             }
-        val currentUser: FirebaseUser? = auth.currentUser
-        uiState.value = UIState(currentUser?.email!!, currentUser?.uid!!, true) //TODO retrieve whether vegan on login
-
-
+        // User should now be logged  in.
     }
 
 
