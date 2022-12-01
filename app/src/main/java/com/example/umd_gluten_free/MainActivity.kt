@@ -1,6 +1,9 @@
 package com.example.umd_gluten_free
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -18,6 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
@@ -25,6 +29,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,6 +37,9 @@ import androidx.navigation.compose.rememberNavController
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import kotlinx.coroutines.launch
@@ -44,8 +52,12 @@ import java.security.MessageDigest
 
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var auth: FirebaseAuth
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        auth = FirebaseAuth.getInstance()
         setContent {
             UMDGlutenFreeTheme {
                 // A surface container using the 'background' color from the theme
@@ -54,7 +66,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colors.background
                 ) {
 
-                    AppNavHost()
+                    AppNavHost(auth = auth, context = LocalContext.current, listenerOwner = this)
 
 
                 }
@@ -68,24 +80,46 @@ class MainActivity : ComponentActivity() {
 fun AppNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    startDestination: String = "mapScreen"
+    startDestination: String = "mapScreen",
+    auth: FirebaseAuth,
+    context: Context,
+    listenerOwner: MainActivity
 ) {
     NavHost(modifier=modifier, navController=navController, startDestination=startDestination) {
-        composable("settingsScreen") { SettingsScreen(navController) }
+        composable("accountManagement") {
+            if (auth.currentUser != null) {
+                // If the user is currently logged in
+                LogoutScreen(auth = auth, onNavigateToMap = {navController.navigate("mapScreen")})
+            } else {
+                LoginScreen(
+                    onNavigateToForgotPass = {navController.navigate("forgotPassword")},
+                    onNavigateToSignup = {navController.navigate("signupScreen")},
+                    auth = auth,
+                    context = context
+                )
+            }
+        }
         composable("listScreen") { ListScreen() }
-        composable("submitNewFood") { SubmitScreen() }
-        composable("forgotPassword") {ForgotPasswordScreen()}
-        composable("signupScreen") {SignupScreen()}
+        composable("submitNewFood") { SubmitScreen(auth = auth, context = context) {
+            navController.navigate(
+                "loginScreen"
+            )
+        }
+        }
+        composable("forgotPassword") {ForgotPasswordScreen(auth = auth, context = context)}
+        composable("signupScreen") {SignupScreen(auth = auth, context = context, listenerOwner = listenerOwner)}
         composable("loginScreen") {
             LoginScreen(
                 onNavigateToForgotPass = {navController.navigate("forgotPassword")},
-                onNavigateToSignup = {navController.navigate("signupScreen")}
+                onNavigateToSignup = {navController.navigate("signupScreen")},
+                auth = auth,
+                context = context
             )
         }
         composable("mapScreen") {
             MapScreen(
                 onNavigateToSettings = {
-                    navController.navigate("settingsScreen") {
+                    navController.navigate("accountManagement") {
                         popUpTo("mapScreen")
                     }
                 },
@@ -107,41 +141,59 @@ fun AppNavHost(
 }
 // Top level screens
 @Composable
-fun SubmitScreen() {
+fun SubmitScreen(auth: FirebaseAuth, context: Context, onNavigateToLogin: () -> Unit) {
     fun submitMeal(mealName:String, locationName: String, vegetarian: Boolean, rating: Int) {
         // trust and believe!
     }
 
+    if (auth.currentUser == null) {
+        Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_LONG).show()
+        onNavigateToLogin
+    }
+    else {
+        Column(modifier = Modifier.fillMaxSize()) {
+            val centered = Modifier.align(Alignment.CenterHorizontally)
+            val mealName = remember { mutableStateOf(TextFieldValue()) }
+            val mealLocation = remember { mutableStateOf(TextFieldValue()) }
+            val rating = remember { mutableStateOf(0) }
+            val isVegan = remember { mutableStateOf(true) }
+            Spacer(modifier = Modifier.height(80.dp))
+            TextField(
+                label = { Text(text = "What did you eat?") },
+                value = mealName.value,
+                onValueChange = { mealName.value = it },
+                modifier = centered
+            )
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        val centered = Modifier.align(Alignment.CenterHorizontally)
-        val mealName = remember { mutableStateOf(TextFieldValue()) }
-        val mealLocation = remember { mutableStateOf(TextFieldValue()) }
-        val rating = remember { mutableStateOf(0) }
-        val isVegan = remember { mutableStateOf(true) }
-        Spacer(modifier = Modifier.height(80.dp))
-        TextField(
-            label = { Text(text = "What did you eat?") },
-            value = mealName.value,
-            onValueChange = { mealName.value = it },
-            modifier = centered)
-
-        Spacer(modifier = Modifier.height(20.dp))
-        TextField(
-            label = {Text("Where did you eat it?")},
-            value = mealLocation.value,
-            onValueChange = {mealLocation.value= it},
-            modifier = centered)
-        Spacer(modifier = Modifier.height(20.dp))
-        Text("Vegan?", modifier = centered)
-        Checkbox(checked = isVegan.value, onCheckedChange = {isVegan.value = it}, modifier = centered)
-        Spacer(modifier = Modifier.height(30.dp))
-        Button(
-            onClick = {submitMeal(mealName.value.toString(), mealLocation.value.toString(), isVegan.value, rating.value)},
-            modifier = centered,
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
-        ) {
-            Text("Submit Meal", color = Color.White)
+            Spacer(modifier = Modifier.height(20.dp))
+            TextField(
+                label = { Text("Where did you eat it?") },
+                value = mealLocation.value,
+                onValueChange = { mealLocation.value = it },
+                modifier = centered
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("Vegan?", modifier = centered)
+            Checkbox(
+                checked = isVegan.value,
+                onCheckedChange = { isVegan.value = it },
+                modifier = centered
+            )
+            Spacer(modifier = Modifier.height(30.dp))
+            Button(
+                onClick = {
+                    submitMeal(
+                        mealName.value.toString(),
+                        mealLocation.value.toString(),
+                        isVegan.value,
+                        rating.value
+                    )
+                },
+                modifier = centered,
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
+            ) {
+                Text("Submit Meal", color = Color.White)
+            }
         }
     }
 }
@@ -152,42 +204,87 @@ fun ListScreen() {
 }
 
 @Composable
-fun SettingsScreen(
-    navController: NavHostController
-) {
+fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentActivity) {
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.padding(20.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Placeholder(component = "Settings screen")
-        Spacer(modifier = Modifier.height(10.dp))
-        TextButton(
-            onClick = {navController.navigate("loginScreen")},
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .fillMaxWidth()
 
-        ) {
-            Text("Log in or Sign up", color = Color.Black)
+        val email = remember { mutableStateOf(TextFieldValue()) }
+        val password = remember { mutableStateOf(TextFieldValue()) }
+        val vegan = remember { mutableStateOf(false) }
+        Text(text = "Sign Up", style = TextStyle(fontSize = 40.sp))
+
+        Spacer(modifier = Modifier.height(20.dp))
+        TextField(
+            label = { Text(text = "Email Address") },
+            value = email.value,
+            onValueChange = { email.value = it })
+
+        Spacer(modifier = Modifier.height(20.dp))
+        TextField(
+            label = { Text(text = "Password (6 characters or more)") },
+            value = password.value,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            onValueChange = { password.value = it })
+
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(modifier = Modifier.align(Alignment.CenterHorizontally), text = "Vegan?")
+        Switch(modifier = Modifier.align(Alignment.CenterHorizontally), checked = vegan.value, onCheckedChange = {vegan.value = it});
+        Spacer(modifier = Modifier.height(20.dp))
+        Box(modifier = Modifier.padding(40.dp, 0.dp, 40.dp, 0.dp)) {
+            Button(
+                onClick = {
+                          auth.createUserWithEmailAndPassword(
+                              email.value.text.trim(),
+                              password.value.text.trim()
+                          ).addOnFailureListener {
+                                  Toast.makeText(context, it.message, Toast.LENGTH_LONG).show()
+                              }
+                },
+                shape = RoundedCornerShape(50.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
+            ) {
+                Text(text = "Sign Up", color = Color.White)
+            }
         }
     }
-
 }
 
 @Composable
-fun SignupScreen() {
-    Placeholder("Signup screen")
-}
-
-@Composable
-fun ForgotPasswordScreen() {
-    Placeholder("forgot password screen")
+fun ForgotPasswordScreen(auth: FirebaseAuth, context: Context) {
+    val email = remember { mutableStateOf(TextFieldValue()) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(text = "Reset your password: ", modifier = Modifier.align(Alignment.CenterHorizontally))
+        Spacer(modifier = Modifier.height(60.dp))
+        TextField(
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            value = email.value,
+            onValueChange = {email.value = it},
+            label = {Text("email address")})
+        Spacer(modifier = Modifier.height(60.dp))
+        Button(
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            onClick = {auth.sendPasswordResetEmail(email.value.text.trim())},
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
+        ) {
+            Text(text = "Send reset email", color = Color.White)
+        }
+    }
 }
 
 //sub-screens
 @Composable
 fun LoginScreen(
     onNavigateToForgotPass: () -> Unit,
-    onNavigateToSignup: () -> Unit
+    onNavigateToSignup: () -> Unit,
+    auth: FirebaseAuth,
+    context: Context
 ) {
     fun hashPassword(clearPassword: String): String {
         val digest = MessageDigest.getInstance("SHA-1")
@@ -235,42 +332,6 @@ fun LoginScreen(
         }
         return ""
     }
-    fun submitSignupAttempt(username: String, password: String, isVegan: Boolean): String {
-        val postData = String.format("user=%s&pass=%s&veg=%b", username, hashPassword(password), isVegan);
-        val url = URL("google.com") //TODO this will not be our endpoint.
-        // Google is not gonna give us a user token.
-
-        val connection = url.openConnection()
-        connection.doOutput = true
-        connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-        connection.setRequestProperty("Content-Length", postData.length.toString())
-        // write to connection
-        DataOutputStream(connection.getOutputStream()).use {
-            it.writeBytes(postData)
-        }
-        //read response
-        var responseBuilder = StringBuilder()
-        BufferedReader(InputStreamReader(connection.getInputStream())) .use { response ->
-            var line: String?
-            while (response.readLine().also { line = it } != null) {
-                responseBuilder.append(line)
-            }
-        }
-
-        val responseJSON = JSONObject(responseBuilder.toString())
-
-        if(responseJSON["status"].toString() != "200") {
-            // Something went wrong.
-            // More error handling in here please :)
-            //TODO
-        }
-        else {
-            return responseJSON["token"].toString()
-        }
-        return ""
-        // more magic!!
-    }
-
 
     Box(modifier = Modifier.fillMaxSize()) {
 
@@ -286,7 +347,7 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        val username = remember { mutableStateOf(TextFieldValue()) }
+        val email = remember { mutableStateOf(TextFieldValue()) }
         val password = remember { mutableStateOf(TextFieldValue()) }
 
         Text(text = "Login Or Sign Up", style = TextStyle(fontSize = 40.sp))
@@ -294,8 +355,8 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(20.dp))
         TextField(
             label = { Text(text = "Username") },
-            value = username.value,
-            onValueChange = { username.value = it })
+            value = email.value,
+            onValueChange = { email.value = it })
 
         Spacer(modifier = Modifier.height(20.dp))
         TextField(
@@ -308,7 +369,14 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(20.dp))
         Box(modifier = Modifier.padding(40.dp, 0.dp, 40.dp, 0.dp)) {
             Button(
-                onClick = { submitLoginAttempt(username.value.toString(), password.value.toString()) },
+                onClick = {
+                    auth.signInWithEmailAndPassword(
+                        email.value.text.trim(),
+                        password.value.text.trim()
+                    ).addOnFailureListener {
+                        Toast.makeText(context, it.message, Toast.LENGTH_LONG).show()
+                    }
+                },
                 shape = RoundedCornerShape(50.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -323,6 +391,21 @@ fun LoginScreen(
         Button(onClick = onNavigateToForgotPass,
             colors = ButtonDefaults.buttonColors(backgroundColor = Color.White)) {
             Text("Forgot Password?")
+        }
+    }
+}
+
+@Composable
+fun LogoutScreen(onNavigateToMap: () -> Unit, auth: FirebaseAuth) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text("Would you like to logout?")
+        Button(modifier = Modifier.align(Alignment.CenterHorizontally),
+            onClick = {
+                auth.signOut()
+                onNavigateToMap()
+            }
+        ) {
+            Text("Yes")
         }
     }
 }
@@ -387,7 +470,7 @@ fun Drawer(
         TextButton(
             onClick = onNavigateToSettings,
             modifier = alignToCenter.fillMaxWidth()
-            ) {Text("Settings", color=Color.Black)}
+            ) {Text("Account Management", color=Color.Black)}
     }
 }
 
@@ -403,6 +486,7 @@ fun DrawerBody() {
     }
 }
 
+@SuppressLint("UnusedMaterialScaffoldPaddingParameter")
 @Composable
 fun MapScreen(
     onNavigateToSettings: () -> Unit,
@@ -436,6 +520,8 @@ fun MapScreen(
 
         // Pass the body in
         // content parameter
+
+        // THIS COULD BE A PROBLEM >:O
         content = {
             DrawerBody()
         },
