@@ -1,5 +1,6 @@
 package com.example.umd_gluten_free
 
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
@@ -14,10 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,21 +41,14 @@ import com.google.firebase.ktx.Firebase
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.DataOutputStream
-import java.io.InputStreamReader
-import java.net.URL
-import java.security.MessageDigest
 
 
 class MainActivity : ComponentActivity() {
-
     private lateinit var auth: FirebaseAuth
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
+
         setContent {
             UMDGlutenFreeTheme {
                 // A surface container using the 'background' color from the theme
@@ -65,9 +56,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-
                     AppNavHost(auth = auth, context = LocalContext.current, listenerOwner = this)
-
 
                 }
             }
@@ -78,6 +67,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavHost(
+    auth: FirebaseAuth,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startDestination: String = "mapScreen",
@@ -120,6 +110,7 @@ fun AppNavHost(
             MapScreen(
                 onNavigateToSettings = {
                     navController.navigate("accountManagement") {
+
                         popUpTo("mapScreen")
                     }
                 },
@@ -141,6 +132,7 @@ fun AppNavHost(
 }
 // Top level screens
 @Composable
+
 fun SubmitScreen(auth: FirebaseAuth, context: Context, onNavigateToLogin: () -> Unit) {
     fun submitMeal(mealName:String, locationName: String, vegetarian: Boolean, rating: Int) {
         // trust and believe!
@@ -195,9 +187,9 @@ fun SubmitScreen(auth: FirebaseAuth, context: Context, onNavigateToLogin: () -> 
                 Text("Submit Meal", color = Color.White)
             }
         }
+
     }
 }
-
 @Composable
 fun ListScreen() {
     Placeholder(component = "List View")
@@ -233,6 +225,7 @@ fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentA
         Spacer(modifier = Modifier.height(20.dp))
         Text(modifier = Modifier.align(Alignment.CenterHorizontally), text = "Vegan?")
         Switch(modifier = Modifier.align(Alignment.CenterHorizontally), checked = vegan.value, onCheckedChange = {vegan.value = it});
+
         Spacer(modifier = Modifier.height(20.dp))
         Box(modifier = Modifier.padding(40.dp, 0.dp, 40.dp, 0.dp)) {
             Button(
@@ -257,6 +250,7 @@ fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentA
 }
 
 @Composable
+
 fun ForgotPasswordScreen(auth: FirebaseAuth, context: Context) {
     val email = remember { mutableStateOf(TextFieldValue()) }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -285,47 +279,12 @@ fun LoginScreen(
     onNavigateToSignup: () -> Unit,
     auth: FirebaseAuth,
     context: Context
+
 ) {
-    fun hashPassword(clearPassword: String): String {
-        val digest = MessageDigest.getInstance("SHA-1")
-        val bytes = digest.digest(clearPassword.toByteArray(Charsets.UTF_8))
-        val hashedPassword = StringBuilder()
-        for (byte in bytes) {
-            hashedPassword.append(String.format("%02X", byte))
-        }
-        return hashedPassword.toString()
-    }
-    fun submitLoginAttempt(username: String, password: String): String {
 
-        // magic! And by magic, I mean we're going to send an http request to our API asking for a user token
-        // using a hashed password and username as a bargaining chip
-        val postData = String.format("user=%s&pass=%s", username, hashPassword(password))
-        val url = URL("google.com") //TODO this wont be our endpoint.
-        // Google is not gonna give us a user token.
-
-        val connection = url.openConnection()
-        connection.doOutput = true
-        connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-        connection.setRequestProperty("Content-Length", postData.length.toString())
-        // write to connection
-        DataOutputStream(connection.getOutputStream()).use {
-            it.writeBytes(postData)
-        }
-        //read response
-        var responseBuilder = StringBuilder()
-        BufferedReader(InputStreamReader(connection.getInputStream())) .use { response ->
-            var line: String?
-            while (response.readLine().also { line = it } != null) {
-                responseBuilder.append(line)
-            }
-        }
-
-        val responseJSON = JSONObject(responseBuilder.toString())
-
-        if(responseJSON["status"].toString() != "200") {
-            // Something went wrong.
-            // More error handling in here please :)
-            //TODO
+    fun submitLoginAttempt(email: String, password: String) {
+        fun onResult(exception: java.lang.Exception?) {
+            Toast.makeText(context, exception?.message, Toast.LENGTH_LONG).show()
         }
         else {
             return responseJSON["token"].toString()
@@ -333,9 +292,10 @@ fun LoginScreen(
         return ""
     }
 
+
     Box(modifier = Modifier.fillMaxSize()) {
 
-        Button(onClick = onNavigateToSignup,
+        Button(onClick = { navController.navigate("signupScreen") },
             colors = ButtonDefaults.buttonColors(backgroundColor = Color.White),
             modifier = Modifier.align(Alignment.BottomCenter)) {
             Text("Sign Up")
@@ -388,7 +348,7 @@ fun LoginScreen(
         }
 
         Spacer(modifier = Modifier.height(20.dp))
-        Button(onClick = onNavigateToForgotPass,
+        Button(onClick = {navController.navigate("forgotPassword")},
             colors = ButtonDefaults.buttonColors(backgroundColor = Color.White)) {
             Text("Forgot Password?")
         }
@@ -437,7 +397,7 @@ fun TopBar(onMenuClicked: () -> Unit) {
 
 @Composable
 fun Drawer(
-    onNavigateToSettings: () -> Unit,
+    onNavigateToAcctManagement: () -> Unit,
     onNavigateToList: () -> Unit,
     onNavigateToSubmit: () -> Unit,
     onNavigateToMap: () -> Unit
@@ -468,7 +428,7 @@ fun Drawer(
             modifier = alignToCenter.fillMaxWidth()
         ) {Text("List View", color=Color.Black)}
         TextButton(
-            onClick = onNavigateToSettings,
+            onClick = onNavigateToAcctManagement,
             modifier = alignToCenter.fillMaxWidth()
             ) {Text("Account Management", color=Color.Black)}
     }
@@ -489,7 +449,7 @@ fun DrawerBody() {
 @SuppressLint("UnusedMaterialScaffoldPaddingParameter")
 @Composable
 fun MapScreen(
-    onNavigateToSettings: () -> Unit,
+    onNavigateToAcctManagement: () -> Unit,
     onNavigateToList: () -> Unit,
     onNavigateToSubmit: () -> Unit,
     onNavigateToMap: () -> Unit
@@ -511,7 +471,6 @@ fun MapScreen(
                 // drawer in coroutine scope
                 onMenuClicked = {
                     coroutineScope.launch {
-                        // to close use -> scaffoldState.drawerState.close()
                         scaffoldState.drawerState.open()
                     }
                 })
@@ -529,7 +488,7 @@ fun MapScreen(
         // pass the drawer
         drawerContent = {
             Drawer(
-                onNavigateToSettings = onNavigateToSettings,
+                onNavigateToAcctManagement = onNavigateToAcctManagement,
                 onNavigateToList = onNavigateToList,
                 onNavigateToSubmit = onNavigateToSubmit,
                 onNavigateToMap = onNavigateToMap
