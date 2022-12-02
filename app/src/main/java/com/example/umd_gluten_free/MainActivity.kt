@@ -4,6 +4,7 @@ package com.example.umd_gluten_free
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
+import android.widget.RatingBar
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -86,11 +87,23 @@ fun AppNavHost(
             }
         }
         composable("listScreen") { ListScreen() }
-        composable("submitNewFood") { SubmitScreen(auth = auth, context = context) {
-            navController.navigate(
-                "loginScreen"
-            )
-        }
+        composable("submitNewFood") {
+            if(auth.currentUser != null) {
+                SubmitScreen(
+                    auth = auth,
+                    context = context,
+                    onNavigateToLogin = { navController.navigate("loginScreen") })
+            } else {
+                Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_LONG).show()
+                LoginScreen(
+                    onNavigateToForgotPass = {navController.navigate("forgotPassword")},
+                    onNavigateToSignup = {navController.navigate("signupScreen")},
+                    auth = auth,
+                    context = context
+                ) {
+                    navController.navigate("mapScreen")
+                }
+            }
         }
         composable("forgotPassword") {ForgotPasswordScreen(auth = auth, context = context)}
         composable("signupScreen") {SignupScreen(
@@ -113,10 +126,7 @@ fun AppNavHost(
         composable("mapScreen") {
             MapScreen(
                 onNavigateToAcctManagement = {
-                    navController.navigate("accountManagement") {
-
-                        popUpTo("mapScreen")
-                    }
+                    navController.navigate("accountManagement")
                 },
                 onNavigateToList = {
                     navController.navigate("listScreen")
@@ -126,8 +136,8 @@ fun AppNavHost(
                 },
                 onNavigateToMap = {
                     navController.navigate("mapScreen")
-                }
-
+                },
+                auth = auth
             )
         }
 
@@ -141,58 +151,57 @@ fun SubmitScreen(auth: FirebaseAuth, context: Context, onNavigateToLogin: () -> 
     fun submitMeal(mealName:String, locationName: String, vegetarian: Boolean, rating: Int) {
         // trust and believe!
     }
+    Column(modifier = Modifier.fillMaxSize()) {
+        val centered = Modifier.align(Alignment.CenterHorizontally)
+        val mealName = remember { mutableStateOf(TextFieldValue()) }
+        val mealLocation = remember { mutableStateOf(TextFieldValue()) }
+        val rating = remember { mutableStateOf(0f) }
+        val isVegan = remember { mutableStateOf(true) }
+        Spacer(modifier = Modifier.height(80.dp))
+        TextField(
+            label = { Text(text = "What did you eat?") },
+            value = mealName.value,
+            onValueChange = { mealName.value = it },
+            modifier = centered
+        )
 
-    if (auth.currentUser == null) {
-        Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_LONG).show()
-        onNavigateToLogin()
-    }
-    else {
-        Column(modifier = Modifier.fillMaxSize()) {
-            val centered = Modifier.align(Alignment.CenterHorizontally)
-            val mealName = remember { mutableStateOf(TextFieldValue()) }
-            val mealLocation = remember { mutableStateOf(TextFieldValue()) }
-            val rating = remember { mutableStateOf(0) }
-            val isVegan = remember { mutableStateOf(true) }
-            Spacer(modifier = Modifier.height(80.dp))
-            TextField(
-                label = { Text(text = "What did you eat?") },
-                value = mealName.value,
-                onValueChange = { mealName.value = it },
-                modifier = centered
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-            TextField(
-                label = { Text("Where did you eat it?") },
-                value = mealLocation.value,
-                onValueChange = { mealLocation.value = it },
-                modifier = centered
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Vegan?", modifier = centered)
-            Checkbox(
-                checked = isVegan.value,
-                onCheckedChange = { isVegan.value = it },
-                modifier = centered
-            )
-            Spacer(modifier = Modifier.height(30.dp))
-            Button(
-                onClick = {
-                    submitMeal(
-                        mealName.value.toString(),
-                        mealLocation.value.toString(),
-                        isVegan.value,
-                        rating.value
-                    )
-                },
-                modifier = centered,
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
-            ) {
-                Text("Submit Meal", color = Color.White)
-            }
+        Spacer(modifier = Modifier.height(20.dp))
+        TextField(
+            label = { Text("Where did you eat it?") },
+            value = mealLocation.value,
+            onValueChange = { mealLocation.value = it },
+            modifier = centered
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(text="What would you rate it? (0-5)", modifier = Modifier.align(Alignment.CenterHorizontally))
+        Slider(
+            value = rating.value,
+            onValueChange = {rating.value = it},
+            valueRange = 0f..5f,
+            steps = 4,
+            colors = SliderDefaults.colors(
+                thumbColor = Color.Red,
+                activeTrackColor = Color.Red
+            ),
+            modifier = Modifier.padding(60.dp, 10.dp)
+        )
+        Spacer(modifier = Modifier.height(30.dp))
+        Button(
+            onClick = {
+                submitMeal(
+                    mealName.value.toString(),
+                    mealLocation.value.toString(),
+                    isVegan.value,
+                    rating.value as Int
+                )
+            },
+            modifier = centered,
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
+        ) {
+            Text("Submit Meal", color = Color.White)
         }
-
     }
+
 }
 @Composable
 fun ListScreen() {
@@ -405,7 +414,8 @@ fun Drawer(
     onNavigateToAcctManagement: () -> Unit,
     onNavigateToList: () -> Unit,
     onNavigateToSubmit: () -> Unit,
-    onNavigateToMap: () -> Unit
+    onNavigateToMap: () -> Unit,
+    auth: FirebaseAuth
 ) {
     Column(
         Modifier.fillMaxSize()
@@ -418,8 +428,6 @@ fun Drawer(
             contentDescription = "",
             modifier = alignToCenter.size(150.dp)
         )
-        // This will get a few more buttons to open other screens
-        //TODO increase font size, decrease padding
         TextButton(
             onClick = onNavigateToSubmit,
             modifier = alignToCenter.fillMaxWidth()
@@ -435,7 +443,7 @@ fun Drawer(
         TextButton(
             onClick = onNavigateToAcctManagement,
             modifier = alignToCenter.fillMaxWidth()
-            ) {Text("Account Management", color=Color.Black)}
+            ) {Text( if (auth.currentUser != null) "Log out" else "Log in" , color=Color.Black)}
     }
 }
 
@@ -457,7 +465,8 @@ fun MapScreen(
     onNavigateToAcctManagement: () -> Unit,
     onNavigateToList: () -> Unit,
     onNavigateToSubmit: () -> Unit,
-    onNavigateToMap: () -> Unit
+    onNavigateToMap: () -> Unit,
+    auth: FirebaseAuth
 ) {
     // to set menu closed by default
     val scaffoldState = rememberScaffoldState(rememberDrawerState(DrawerValue.Closed))
@@ -496,7 +505,8 @@ fun MapScreen(
                 onNavigateToAcctManagement = onNavigateToAcctManagement,
                 onNavigateToList = onNavigateToList,
                 onNavigateToSubmit = onNavigateToSubmit,
-                onNavigateToMap = onNavigateToMap
+                onNavigateToMap = onNavigateToMap,
+                auth =  auth
             )
         }
     )
