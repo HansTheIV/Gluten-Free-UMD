@@ -192,7 +192,7 @@ fun SubmitScreen(auth: FirebaseAuth, context: Context, onNavigateToLogin: () -> 
                     mealName.value.toString(),
                     mealLocation.value.toString(),
                     isVegan.value,
-                    rating.value as Int
+                    rating.value.toInt()
                 )
             },
             modifier = centered,
