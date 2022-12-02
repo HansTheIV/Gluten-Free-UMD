@@ -27,7 +27,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,8 +35,6 @@ import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import kotlinx.coroutines.launch
@@ -56,7 +53,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    AppNavHost(auth = auth, context = LocalContext.current, listenerOwner = this)
+                    AppNavHost(context = LocalContext.current, listenerOwner = this, auth = auth)
 
                 }
             }
@@ -71,7 +68,6 @@ fun AppNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startDestination: String = "mapScreen",
-    auth: FirebaseAuth,
     context: Context,
     listenerOwner: MainActivity
 ) {
@@ -86,7 +82,7 @@ fun AppNavHost(
                     onNavigateToSignup = {navController.navigate("signupScreen")},
                     auth = auth,
                     context = context
-                )
+                ) { navController.navigate("mapScreen") }
             }
         }
         composable("listScreen") { ListScreen() }
@@ -97,18 +93,26 @@ fun AppNavHost(
         }
         }
         composable("forgotPassword") {ForgotPasswordScreen(auth = auth, context = context)}
-        composable("signupScreen") {SignupScreen(auth = auth, context = context, listenerOwner = listenerOwner)}
+        composable("signupScreen") {SignupScreen(
+            auth = auth,
+            context = context,
+            listenerOwner = listenerOwner,
+            onNavigateToMap = {navController.navigate("mapScreen")})}
         composable("loginScreen") {
             LoginScreen(
                 onNavigateToForgotPass = {navController.navigate("forgotPassword")},
                 onNavigateToSignup = {navController.navigate("signupScreen")},
+                onNavigateToMap = {
+                    navController.navigate("mapScreen")
+
+                                  },
                 auth = auth,
                 context = context
             )
         }
         composable("mapScreen") {
             MapScreen(
-                onNavigateToSettings = {
+                onNavigateToAcctManagement = {
                     navController.navigate("accountManagement") {
 
                         popUpTo("mapScreen")
@@ -140,7 +144,7 @@ fun SubmitScreen(auth: FirebaseAuth, context: Context, onNavigateToLogin: () -> 
 
     if (auth.currentUser == null) {
         Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_LONG).show()
-        onNavigateToLogin
+        onNavigateToLogin()
     }
     else {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -196,7 +200,7 @@ fun ListScreen() {
 }
 
 @Composable
-fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentActivity) {
+fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentActivity, onNavigateToMap: () -> Unit) {
     Column(
         modifier = Modifier.padding(20.dp),
         verticalArrangement = Arrangement.Center,
@@ -224,7 +228,7 @@ fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentA
 
         Spacer(modifier = Modifier.height(20.dp))
         Text(modifier = Modifier.align(Alignment.CenterHorizontally), text = "Vegan?")
-        Switch(modifier = Modifier.align(Alignment.CenterHorizontally), checked = vegan.value, onCheckedChange = {vegan.value = it});
+        Switch(modifier = Modifier.align(Alignment.CenterHorizontally), checked = vegan.value, onCheckedChange = {vegan.value = it})
 
         Spacer(modifier = Modifier.height(20.dp))
         Box(modifier = Modifier.padding(40.dp, 0.dp, 40.dp, 0.dp)) {
@@ -233,9 +237,14 @@ fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentA
                           auth.createUserWithEmailAndPassword(
                               email.value.text.trim(),
                               password.value.text.trim()
-                          ).addOnFailureListener {
-                                  Toast.makeText(context, it.message, Toast.LENGTH_LONG).show()
+                          ).addOnCompleteListener {
+                              if (it.isSuccessful) {
+                                  Toast.makeText(context, "Login Successful!", Toast.LENGTH_SHORT).show()
+                                  onNavigateToMap()
+                              } else {
+                                  Toast.makeText(context, it.exception?.message, Toast.LENGTH_LONG).show()
                               }
+                          }
                 },
                 shape = RoundedCornerShape(50.dp),
                 modifier = Modifier
@@ -278,24 +287,12 @@ fun LoginScreen(
     onNavigateToForgotPass: () -> Unit,
     onNavigateToSignup: () -> Unit,
     auth: FirebaseAuth,
-    context: Context
+    context: Context,
+    onNavigateToMap: () -> Unit
 
 ) {
-
-    fun submitLoginAttempt(email: String, password: String) {
-        fun onResult(exception: java.lang.Exception?) {
-            Toast.makeText(context, exception?.message, Toast.LENGTH_LONG).show()
-        }
-        else {
-            return responseJSON["token"].toString()
-        }
-        return ""
-    }
-
-
     Box(modifier = Modifier.fillMaxSize()) {
-
-        Button(onClick = { navController.navigate("signupScreen") },
+        Button(onClick = onNavigateToSignup,
             colors = ButtonDefaults.buttonColors(backgroundColor = Color.White),
             modifier = Modifier.align(Alignment.BottomCenter)) {
             Text("Sign Up")
@@ -333,8 +330,16 @@ fun LoginScreen(
                     auth.signInWithEmailAndPassword(
                         email.value.text.trim(),
                         password.value.text.trim()
-                    ).addOnFailureListener {
-                        Toast.makeText(context, it.message, Toast.LENGTH_LONG).show()
+                    ).addOnCompleteListener {
+                        if(it.isSuccessful) {
+                            //redirect to map, login-successful toast message
+                            onNavigateToMap()
+                            Toast.makeText(context, "Login successful!", Toast.LENGTH_LONG).show()
+                        }
+                        else {
+                            // toast failure message
+                            Toast.makeText(context, "Error: " + it.exception?.message, Toast.LENGTH_LONG).show()
+                        }
                     }
                 },
                 shape = RoundedCornerShape(50.dp),
@@ -348,7 +353,7 @@ fun LoginScreen(
         }
 
         Spacer(modifier = Modifier.height(20.dp))
-        Button(onClick = {navController.navigate("forgotPassword")},
+        Button(onClick = onNavigateToForgotPass,
             colors = ButtonDefaults.buttonColors(backgroundColor = Color.White)) {
             Text("Forgot Password?")
         }
