@@ -33,12 +33,12 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.recyclerview.widget.RecyclerView
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.GeoPoint
+import com.google.firebase.firestore.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.maps.android.compose.CameraPositionState
@@ -51,6 +51,9 @@ import kotlin.coroutines.CoroutineContext
 
 
 class MainActivity : ComponentActivity() {
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var mealArrayList: ArrayList<Meal>
+    private lateinit var myAdapter: MyAdapter
     private lateinit var auth: FirebaseAuth
     private lateinit var db : FirebaseFirestore
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -284,7 +287,21 @@ fun SubmitScreen(
 
 @Composable
 fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
-    suspend fun getLocations(): List<String>  {
+/** I don't know if this is code for compose or not
+
+    recyclerView = findViewById(R.id.recyclerView)
+    recyclerView.LayoutManager = LinearLayoutManager(this)
+    recyclerView.setHasFixedSize(true)
+
+    mealArrayList = arrayListOf()
+
+    myAdapter = myAdapter(mealArrayList)
+
+    recyclerView.adapter = myAdapter
+
+    EventChangeListener()
+**/
+    suspend fun getLocations(): List<String> {
         return CoroutineScope(context).async {
             val locationData = db.collection("Locations")
             val list = mutableListOf<String>()
@@ -301,11 +318,29 @@ fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
                 }
             list
         }.await()
+
+        //Placeholder(component = "List View")
     }
-
-
-//Placeholder(component = "List View")
 }
+
+@Composable
+fun EventChangeListener(db: FirebaseFirestore, mealArrayList: ArrayList<Meal>) {
+    db.collection("Meals").addSnapshotListener(object: EventListener<QuerySnapshot> {
+        override fun onEvent(value: QuerySnapshot?, error: FirebaseFirestoreException?) {
+            if (error != null) {
+                Log.e("Firestore Error", error.message.toString())
+                return
+            }
+
+            for (doc: DocumentChange in value?.documentChanges!!) {
+                if (doc.type == DocumentChange.Type.ADDED) {
+                    mealArrayList.add(doc.document.toObject(Meal::class.java))
+                }
+            }
+        }
+    })
+}
+
 
 @Composable
 fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentActivity, onNavigateToMap: () -> Unit) {
