@@ -2,8 +2,10 @@ package com.example.umd_gluten_free
 
 
 import android.annotation.SuppressLint
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,7 +43,11 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
 
 
 class MainActivity : ComponentActivity() {
@@ -93,7 +99,7 @@ fun AppNavHost(
                 )
             }
         }
-        composable("listScreen") { ListScreen(db = db) }
+        composable("listScreen") { ListScreen(db = db, context = Dispatchers.Default) }
         composable("submitNewFood") {
             if(auth.currentUser != null) {
                 SubmitScreen(
@@ -210,8 +216,8 @@ fun SubmitScreen(
         // so if the location already exists in our database, fine! if not, we should add it.
         val meal = hashMapOf(
             "mealName" to mealName,
-            "locationName" to locationName,
-            "locationPoint" to geoPoint
+            "location" to locationName,
+            "rating" to rating
         )
         db.collection("Meals")
             .add(meal)
@@ -275,9 +281,30 @@ fun SubmitScreen(
     }
 
 }
+
 @Composable
-fun ListScreen(db: FirebaseFirestore) {
-    Placeholder(component = "List View")
+fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
+    suspend fun getLocations(): List<String>  {
+        return CoroutineScope(context).async {
+            val locationData = db.collection("Locations")
+            val list = mutableListOf<String>()
+
+            locationData.get().addOnSuccessListener { documents ->
+                for (document in documents) {
+                    val restaurant = document.data["name:"].toString().trim()
+                    val coordinates = document.data["locationPoint:"].toString().trim()
+
+                }
+            }
+                .addOnFailureListener { exception ->
+                    Log.w(TAG, "Error getting documents: ", exception)
+                }
+            list
+        }.await()
+    }
+
+
+//Placeholder(component = "List View")
 }
 
 @Composable
