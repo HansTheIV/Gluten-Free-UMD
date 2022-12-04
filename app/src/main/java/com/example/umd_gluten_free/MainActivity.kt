@@ -38,7 +38,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.recyclerview.widget.RecyclerView
 import com.example.umd_gluten_free.composables.ProgressBar
 import com.example.umd_gluten_free.composables.MealCard
-import com.example.umd_gluten_free.composables.ProgressBar
 import com.example.umd_gluten_free.data.DataOrException
 import com.example.umd_gluten_free.data.Meal
 import com.example.umd_gluten_free.extra.MealsViewModel
@@ -76,7 +75,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    AppNavHost(context = LocalContext.current, listenerOwner = this, auth = auth, db = db, dataOrException = dataOrException)
+                    AppNavHost(context = LocalContext.current, listenerOwner = this, auth = auth, db = db, viewModel = viewModel, dataOrException = dataOrException)
 
                 }
             }
@@ -94,7 +93,8 @@ fun AppNavHost(
     context: Context,
     listenerOwner: MainActivity,
     db: FirebaseFirestore,
-    dataOrException: DataOrException<List<Meal>, Exception>
+    dataOrException: DataOrException<List<Meal>, Exception>,
+    viewModel: MealsViewModel
 ) {
     NavHost(modifier=modifier, navController=navController, startDestination=startDestination) {
         composable("accountManagement") {
@@ -111,7 +111,7 @@ fun AppNavHost(
                 )
             }
         }
-        composable("listScreen") { ListScreen(db = db, context = Dispatchers.Default, dataOrException = dataOrException) }
+        composable("listScreen") { ListScreen(db = db, context = Dispatchers.Default, viewModel = viewModel, dataOrException = dataOrException) }
         composable("submitNewFood") {
             if(auth.currentUser != null) {
                 SubmitScreen(
@@ -336,7 +336,7 @@ fun SubmitScreen(
 }
 
 @Composable
-fun ListScreen(db: FirebaseFirestore, context: CoroutineContext, dataOrException: DataOrException<List<Meal>, Exception>) {
+fun ListScreen(db: FirebaseFirestore, context: CoroutineContext, viewModel: MealsViewModel, dataOrException: DataOrException<List<Meal>, Exception>) {
     val meals = dataOrException.data
     meals?.let {
         LazyColumn {
@@ -362,7 +362,6 @@ fun ListScreen(db: FirebaseFirestore, context: CoroutineContext, dataOrException
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ProgressBar(
-            //TODO: FIGURE THIS ONE LINE OF CODE OUT
             isDisplayed = viewModel.loading.value
         )
     }
