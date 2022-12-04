@@ -2,16 +2,18 @@ package com.example.umd_gluten_free
 
 
 import android.annotation.SuppressLint
-import android.content.ContentValues.TAG
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
@@ -34,6 +36,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.recyclerview.widget.RecyclerView
+import com.example.umd_gluten_free.composables.ProgressBar
+import com.example.umd_gluten_free.composables.MealCard
+import com.example.umd_gluten_free.composables.ProgressBar
+import com.example.umd_gluten_free.data.DataOrException
+import com.example.umd_gluten_free.data.Meal
+import com.example.umd_gluten_free.extra.MealsViewModel
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -54,19 +62,21 @@ class MainActivity : ComponentActivity() {
     private lateinit var myAdapter: MyAdapter
     private lateinit var auth: FirebaseAuth
     private lateinit var db : FirebaseFirestore
+    private val viewModel: MealsViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         db = Firebase.firestore
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
 
         setContent {
+            val dataOrException = viewModel.data.value
             UMDGlutenFreeTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    AppNavHost(context = LocalContext.current, listenerOwner = this, auth = auth, db = db)
+                    AppNavHost(context = LocalContext.current, listenerOwner = this, auth = auth, db = db, dataOrException = dataOrException)
 
                 }
             }
@@ -83,7 +93,8 @@ fun AppNavHost(
     startDestination: String = "mapScreen",
     context: Context,
     listenerOwner: MainActivity,
-    db: FirebaseFirestore
+    db: FirebaseFirestore,
+    dataOrException: DataOrException<List<Meal>, Exception>
 ) {
     NavHost(modifier=modifier, navController=navController, startDestination=startDestination) {
         composable("accountManagement") {
@@ -100,7 +111,7 @@ fun AppNavHost(
                 )
             }
         }
-        composable("listScreen") { ListScreen(db = db, context = Dispatchers.Default) }
+        composable("listScreen") { ListScreen(db = db, context = Dispatchers.Default, dataOrException = dataOrException) }
         composable("submitNewFood") {
             if(auth.currentUser != null) {
                 SubmitScreen(
@@ -325,8 +336,38 @@ fun SubmitScreen(
 }
 
 @Composable
-fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
-/** I don't know if this is code for compose or not
+fun ListScreen(db: FirebaseFirestore, context: CoroutineContext, dataOrException: DataOrException<List<Meal>, Exception>) {
+    val meals = dataOrException.data
+    meals?.let {
+        LazyColumn {
+            items(
+                items = meals
+            ) { meal ->
+                MealCard(meal = meal)
+            }
+        }
+    }
+
+    val e = dataOrException.e
+    e?.let {
+        Text(
+            text = e.message!!,
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ProgressBar(
+            //TODO: FIGURE THIS ONE LINE OF CODE OUT
+            isDisplayed = viewModel.loading.value
+        )
+    }
+}
+    /** I don't know if this is code for compose or not
 
     recyclerView = findViewById(R.id.recyclerView)
     recyclerView.LayoutManager = LinearLayoutManager(this)
@@ -339,7 +380,7 @@ fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
     recyclerView.adapter = myAdapter
 
     EventChangeListener()
-**/
+
     suspend fun getLocations(): List<String> {
         return CoroutineScope(context).async {
             val locationData = db.collection("Locations")
@@ -360,7 +401,8 @@ fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
 
         //Placeholder(component = "List View")
     }
-}
+**/
+
 
 @Composable
 fun EventChangeListener(db: FirebaseFirestore, mealArrayList: ArrayList<Meal>) {

@@ -8,9 +8,11 @@ buildscript {
     dependencies {
         classpath 'com.google.gms:google-services:4.3.13'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.0"
+        classpath "com.google.dagger:hilt-android-gradle-plugin:2.37"
     }
     ext {
         compose_version = '1.2.0'
+        hilt_version = '2.37'
     }
 }// Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
