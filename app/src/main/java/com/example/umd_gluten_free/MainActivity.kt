@@ -43,11 +43,9 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlin.coroutines.CoroutineContext
+import kotlin.math.*
 
 
 class MainActivity : ComponentActivity() {
@@ -108,8 +106,9 @@ fun AppNavHost(
                 SubmitScreen(
                     auth = auth,
                     context = context,
-                    onNavigateToLogin = { navController.navigate("loginScreen") },
-                    db = db
+                    //onNavigateToLogin = { navController.navigate("loginScreen") },
+                    db = db,
+                    coroutineContext = Dispatchers.Default
                 )
             } else {
                 Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_LONG).show()
@@ -171,46 +170,84 @@ fun AppNavHost(
 fun SubmitScreen(
     auth: FirebaseAuth,
     context: Context,
-    onNavigateToLogin: () -> Unit,
-    db: FirebaseFirestore
+    db: FirebaseFirestore,
+    coroutineContext: CoroutineDispatcher
 ) {
-    fun locationNameIsInDatabase(placeName: String): Boolean {
+    suspend fun locationNameIsInDatabase(placeName: String): Boolean {
         var found = false
-        db.collection("Locations").get()
-            .addOnCompleteListener {
-                if(it.isSuccessful) {
-                    for(document in it.result) {
-                        if(document.data["locationName"].toString().trim().lowercase() == placeName.trim().lowercase()) {
-                            found = true
+        return withContext(CoroutineScope(coroutineContext).coroutineContext) {
+            db.collection("Locations").get()
+                .addOnCompleteListener {
+                    if (it.isSuccessful) {
+                        for (document in it.result) {
+                            if (document.data["locationName"].toString().trim()
+                                    .lowercase() == placeName.trim().lowercase()
+                            ) {
+                                found = true
+                            }
                         }
                     }
                 }
-            }
-        return found
+            found
+        }
     }
-    fun translateToGeoPoint(placeName: String): GeoPoint {
+    suspend fun translateToGeoPoint(placeName: String): GeoPoint {
         // if the name is already in our database, return that geopoint. Otherwise, convert via geocoder
-        var found = false
-        var point = GeoPoint(0.0, 0.0)
-        db.collection("Locations").get()
-            .addOnCompleteListener {
-                if(it.isSuccessful) {
-                    for(document in it.result) {
-                        if(document.data["locationName"].toString().trim().lowercase() == placeName.trim().lowercase()) {
-                            point = document.data["locationPoint"] as GeoPoint
+        if(locationNameIsInDatabase(placeName)){
+            return CoroutineScope(coroutineContext).async {
+                var point = GeoPoint(0.0, 0.0)
+                db.collection("Locations").get()
+                    .addOnCompleteListener {
+                        if (it.isSuccessful) {
+                            for (document in it.result) {
+                                if (document.data["locationName"].toString().trim()
+                                        .lowercase() == placeName.trim().lowercase()
+                                ) {
+                                    point = document.data["locationPoint"] as GeoPoint
+                                }
+                            }
                         }
                     }
-                }
-            }
-        return point
+                point
+            }.await()
+        }
+        else {
+            // actually figure out how the hell to do that lmao
+            return GeoPoint(0.0, 0.0)
+        }
     }
 
-    fun isInCollegePark(locationPoint: GeoPoint): Boolean {
-        // if distance from UMD is less than ten miles, true. else false
-        return true
+    suspend fun isInCollegePark(locationPoint: GeoPoint): Boolean {
+        fun haversine(point1: GeoPoint, point2: GeoPoint): Double
+        {
+            var lat1 = point1.latitude
+            var lat2 = point2.latitude
+            val lon1 = point1.longitude
+            val lon2 = point2.longitude
+
+            // distance between latitudes and longitudes
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLon = Math.toRadians(lon2 - lon1)
+
+            // convert to radians
+            lat1 = Math.toRadians(lat1)
+            lat2 = Math.toRadians(lat2)
+
+            // apply formulae
+            val a: Double = sin(dLat / 2).pow(2) +
+            sin(dLon / 2).pow(2.0) *
+                    cos(lat1) *
+                    cos(lat2)
+            val rad = 6371.0
+            val c: Double = 2 * asin(sqrt(a))
+            return rad * c
+            // returns distance between two geopoints in kilometers.
+        }
+        // if distance from UMD is less than ten miles (20km), true. else false
+        return (haversine(locationPoint, translateToGeoPoint("University Of Maryland")) < 20.0)
     }
 
-    fun submitMeal(mealName:String, locationName: String, rating: Int) {
+    suspend fun submitMeal(mealName:String, locationName: String, rating: Int) {
         val geoPoint = translateToGeoPoint(locationName)
         if (!isInCollegePark(geoPoint)) {
             Toast.makeText(context, "Location could not be parsed. Please check for typos and try again.", Toast.LENGTH_SHORT).show()
@@ -270,11 +307,13 @@ fun SubmitScreen(
         Spacer(modifier = Modifier.height(30.dp))
         Button(
             onClick = {
-                submitMeal(
-                    mealName.value.toString(),
-                    mealLocation.value.toString(),
-                    rating.value.toInt()
-                )
+                runBlocking {
+                    submitMeal(
+                        mealName.value.toString(),
+                        mealLocation.value.toString(),
+                        rating.value.toInt()
+                    )
+                }
             },
             modifier = centered,
             colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
