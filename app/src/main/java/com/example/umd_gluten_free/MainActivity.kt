@@ -41,19 +41,21 @@ import com.example.umd_gluten_free.composables.MealCard
 import com.example.umd_gluten_free.data.Meal
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.*
-import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
-import kotlin.math.*
 
 
 class MainActivity : ComponentActivity() {
     private lateinit var auth: FirebaseAuth
-    private lateinit var db : FirebaseFirestore
+    private lateinit var db : DatabaseReference
     override fun onCreate(savedInstanceState: Bundle?) {
-        db = Firebase.firestore
+        db = Firebase.database.reference
+
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
 
@@ -81,7 +83,7 @@ fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startDestination: String = "homeScreen",
     context: Context,
-    db: FirebaseFirestore
+    db: DatabaseReference
 ) {
     val filter = remember { mutableStateOf(false)}
     val filterGreaterThan = remember { mutableStateOf(0f)}
@@ -110,9 +112,8 @@ fun AppNavHost(
             if(auth.currentUser != null) {
                 SubmitScreen(
                     context = context,
-                    db = db,
-                    onNavigateHome = { navController.navigate("homeScreen") }
-                )
+                    db = db
+                ) { navController.navigate("homeScreen") }
             } else {
                 Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_SHORT).show()
                 LoginScreen(
@@ -158,28 +159,27 @@ fun AppNavHost(
 
 fun SubmitScreen(
     context: Context,
-    db: FirebaseFirestore,
+    db: DatabaseReference,
     onNavigateHome: () -> Unit,
 ) {
 
     fun submitMeal(mealName:String, locationName: String, rating: Int) {
 
+        val key = db.child("meals").push().key
+                if (key == null) {
+                    Toast.makeText(context, "Error submitting meal to server", Toast.LENGTH_SHORT).show()
+                    return
+                }
         val meal = hashMapOf(
             "mealName" to mealName,
             "locationName" to locationName,
             "rating" to rating
         )
-        db.collection("Meals")
-            .add(meal)
-            .addOnCompleteListener {
-                if(it.isSuccessful) {
-                    Toast.makeText(context, "Submission complete!", Toast.LENGTH_SHORT).show()
-                    onNavigateHome()
-                }
-                else {
-                    Toast.makeText(context, "Error submitting: " + it.exception?.message, Toast.LENGTH_SHORT).show()
-                }
-            }
+
+        val childUpdates = hashMapOf<String, Any>(
+            "meals/$key" to meal
+        )
+        db.updateChildren(childUpdates)
     }
     Column(modifier = Modifier.fillMaxSize()) {
         val centered = Modifier.align(Alignment.CenterHorizontally)
@@ -236,23 +236,21 @@ fun SubmitScreen(
 
 @Composable
 fun ListScreen(
-    db: FirebaseFirestore,
+    db: DatabaseReference,
     toastContext: Context,
     filter: MutableState<Boolean>,
     filterGreaterThan: MutableState<Float>
 ) {
     val mealList = ArrayList<Meal>()
+
     suspend fun getProductsFromFirestore() {
-        val result = db.collection("Meals")
-                        .whereGreaterThanOrEqualTo("rating", if (filter.value) filterGreaterThan.value.toLong() else 0.toLong())
+        val mealIds = db.child("Meals")
                         .get()
                         .await()
+                        .getChildren()
         try {
-            for (document in result) {
-                val loc = document.data["locationName"].toString().trim()
-                val name = document.data["mealName"].toString().trim()
-                val rating: Long = document.data["rating"] as Long
-                val newMeal = Meal(loc, name, rating)
+            for (currentMeal in mealIds) {
+                val newMeal: Meal = currentMeal.getValue(Meal::class.java)!!
                 mealList.add(newMeal)
                 Log.e("NEW MEAL ADDED", mealList.toString())
             }
@@ -601,7 +599,7 @@ fun Drawer(
 
 @Composable
 fun DrawerBody(
-    db: FirebaseFirestore,
+    db: DatabaseReference,
     toastContext: Context,
     filter: MutableState<Boolean>,
     filterGreaterThan: MutableState<Float>
@@ -622,7 +620,7 @@ fun homeScreen(
     onNavigateToAcctManagement: () -> Unit,
     onNavigateToSubmit: () -> Unit,
     auth: FirebaseAuth,
-    db: FirebaseFirestore,
+    db: DatabaseReference,
     toastContext: Context,
     filter: MutableState<Boolean>,
     filterGreaterThan: MutableState<Float>
