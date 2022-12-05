@@ -56,7 +56,6 @@ class MainActivity : ComponentActivity() {
         db = Firebase.firestore
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
-
         setContent {
 
             UMDGlutenFreeTheme {
