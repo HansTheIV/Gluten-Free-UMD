@@ -1,5 +1,6 @@
 package com.example.umd_gluten_free.composables
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
@@ -8,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.umd_gluten_free.data.Meal
@@ -29,6 +31,7 @@ fun MealCard(
             )
             .fillMaxWidth(),
         elevation = 3.dp,
+        border = BorderStroke(0.5.dp, color = Color.Black)
     ) {
         Row(
             modifier = Modifier
@@ -37,9 +40,9 @@ fun MealCard(
         ){
             meal.name?.let { name ->
                 Text(
-                    text = name,
+                    text = name + "\n\uD83C\uDF1F" + meal.rating.toString(),
                     modifier = Modifier
-                        .fillMaxWidth(0.85f)
+                        .fillMaxWidth(0.80f)
                         .wrapContentWidth(Alignment.Start),
                     color = Color.DarkGray,
                     fontSize = 20.sp
@@ -47,22 +50,10 @@ fun MealCard(
             }
             meal.location?.let { location ->
                 Text(
-                    text = location.toString(),
-                    modifier = Modifier
-                        .wrapContentWidth(Alignment.CenterHorizontally)
-                    ,
+                    text = location.replace(" ", "\n"),
                     color = Color.DarkGray,
-                    fontSize = 20.sp
-                )
-            }
-            meal.rating?.let { rating ->
-                Text(
-                    text = rating.toString(),
-                    modifier = Modifier
-                        .wrapContentWidth(Alignment.End)
-                    ,
-                    color = Color.DarkGray,
-                    fontSize = 20.sp
+                    fontSize = 15.sp,
+                    textAlign = TextAlign.Justify
                 )
             }
         }

@@ -8,8 +8,9 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,29 +30,22 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.recyclerview.widget.RecyclerView
-import com.example.umd_gluten_free.composables.ProgressBar
 import com.example.umd_gluten_free.composables.MealCard
-import com.example.umd_gluten_free.data.DataOrException
 import com.example.umd_gluten_free.data.Meal
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.*
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import com.google.maps.android.compose.CameraPositionState
-import com.google.maps.android.compose.GoogleMap
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
-import kotlin.coroutines.CoroutineContext
 import kotlin.math.*
 
 
@@ -71,7 +65,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    AppNavHost(context = LocalContext.current, listenerOwner = this, auth = auth, db = db)
+                    AppNavHost(context = LocalContext.current, auth = auth, db = db)
 
                 }
             }
@@ -85,35 +79,40 @@ fun AppNavHost(
     auth: FirebaseAuth,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    startDestination: String = "mapScreen",
+    startDestination: String = "homeScreen",
     context: Context,
-    listenerOwner: MainActivity,
     db: FirebaseFirestore
 ) {
+    val filter = remember { mutableStateOf(false)}
+    val filterGreaterThan = remember { mutableStateOf(0f)}
     NavHost(modifier=modifier, navController=navController, startDestination=startDestination) {
         composable("accountManagement") {
             if (auth.currentUser != null) {
                 // If the user is currently logged in
-                LogoutScreen(auth = auth, onNavigateToMap = {navController.navigate("mapScreen")})
+                LogoutScreen(auth = auth, onNavigateToMap = {navController.navigate("homeScreen")}, context = LocalContext.current)
             } else {
                 LoginScreen(
                     onNavigateToForgotPass = {navController.navigate("forgotPassword")},
                     onNavigateToSignup = {navController.navigate("signupScreen")},
                     auth = auth,
                     context = context,
-                    { navController.navigate("mapScreen") },
+                    onNavigateHome = { navController.navigate("homeScreen") }
                 )
             }
         }
-        composable("listScreen") { ListScreen(db = db, context = Dispatchers.Default) }
+        composable("listScreen") { ListScreen(
+            db = db,
+            toastContext = context,
+            filter = filter,
+            filterGreaterThan = filterGreaterThan
+        ) }
         composable("submitNewFood") {
             if(auth.currentUser != null) {
                 SubmitScreen(
-                    auth = auth,
                     context = context,
                     //onNavigateToLogin = { navController.navigate("loginScreen") },
                     db = db,
-                    coroutineContext = Dispatchers.Default
+                    onNavigateHome = { navController.navigate("homeScreen") }
                 )
             } else {
                 Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_LONG).show()
@@ -122,47 +121,33 @@ fun AppNavHost(
                     onNavigateToSignup = {navController.navigate("signupScreen")},
                     auth = auth,
                     context = context,
-                    onNavigateToMap = {
-                        navController.navigate("mapScreen")
-                    },
-
-                )
+                    onNavigateHome = { navController.navigate("homeScreen") }
+                    )
             }
         }
         composable("forgotPassword") {ForgotPasswordScreen(auth = auth, context = context)}
         composable("signupScreen") {SignupScreen(
             auth = auth,
             context = context,
-            listenerOwner = listenerOwner,
-            onNavigateToMap = {navController.navigate("mapScreen")})}
+            onNavigateToMap = { navController.navigate("homeScreen") })}
         composable("loginScreen") {
             LoginScreen(
                 onNavigateToForgotPass = {navController.navigate("forgotPassword")},
                 onNavigateToSignup = {navController.navigate("signupScreen")},
                 auth = auth,
                 context = context,
-                onNavigateToMap = {
-                    navController.navigate("mapScreen")
-
-                                  },
+                onNavigateHome = { navController.navigate("homeScreen") },
             )
         }
-        composable("mapScreen") {
-            MapScreen(
-                onNavigateToAcctManagement = {
-                    navController.navigate("accountManagement")
-                },
-                onNavigateToList = {
-                    navController.navigate("listScreen")
-                },
-                onNavigateToSubmit = {
-                    navController.navigate("submitNewFood")
-                },
-                onNavigateToMap = {
-                    navController.navigate("mapScreen")
-                },
+        composable("homeScreen") {
+            homeScreen(
+                onNavigateToAcctManagement = { navController.navigate("accountManagement") },
+                onNavigateToSubmit = { navController.navigate("submitNewFood") },
                 auth = auth,
-                db = db
+                db = db,
+                toastContext = context,
+                filter = filter,
+                filterGreaterThan = filterGreaterThan
             )
         }
 
@@ -173,102 +158,24 @@ fun AppNavHost(
 @Composable
 
 fun SubmitScreen(
-    auth: FirebaseAuth,
     context: Context,
     db: FirebaseFirestore,
-    coroutineContext: CoroutineDispatcher
+    onNavigateHome: () -> Unit,
 ) {
-    suspend fun locationNameIsInDatabase(placeName: String): Boolean {
-        var found = false
-        return withContext(CoroutineScope(coroutineContext).coroutineContext) {
-            db.collection("Locations").get()
-                .addOnCompleteListener {
-                    if (it.isSuccessful) {
-                        for (document in it.result) {
-                            if (document.data["locationName"].toString().trim()
-                                    .lowercase() == placeName.trim().lowercase()
-                            ) {
-                                found = true
-                            }
-                        }
-                    }
-                }
-            found
-        }
-    }
-    suspend fun translateToGeoPoint(placeName: String): GeoPoint {
-        // if the name is already in our database, return that geopoint. Otherwise, convert via geocoder
-        if(locationNameIsInDatabase(placeName)){
-            return CoroutineScope(coroutineContext).async {
-                var point = GeoPoint(0.0, 0.0)
-                db.collection("Locations").get()
-                    .addOnCompleteListener {
-                        if (it.isSuccessful) {
-                            for (document in it.result) {
-                                if (document.data["locationName"].toString().trim()
-                                        .lowercase() == placeName.trim().lowercase()
-                                ) {
-                                    point = document.data["locationPoint"] as GeoPoint
-                                }
-                            }
-                        }
-                    }
-                point
-            }.await()
-        }
-        else {
-            // actually figure out how the hell to do that lmao
-            return GeoPoint(0.0, 0.0)
-        }
-    }
 
-    suspend fun isInCollegePark(locationPoint: GeoPoint): Boolean {
-        fun haversine(point1: GeoPoint, point2: GeoPoint): Double
-        {
-            var lat1 = point1.latitude
-            var lat2 = point2.latitude
-            val lon1 = point1.longitude
-            val lon2 = point2.longitude
+    fun submitMeal(mealName:String, locationName: String, rating: Int) {
 
-            // distance between latitudes and longitudes
-            val dLat = Math.toRadians(lat2 - lat1)
-            val dLon = Math.toRadians(lon2 - lon1)
-
-            // convert to radians
-            lat1 = Math.toRadians(lat1)
-            lat2 = Math.toRadians(lat2)
-
-            // apply formulae
-            val a: Double = sin(dLat / 2).pow(2) +
-            sin(dLon / 2).pow(2.0) *
-                    cos(lat1) *
-                    cos(lat2)
-            val rad = 6371.0
-            val c: Double = 2 * asin(sqrt(a))
-            return rad * c
-            // returns distance between two geopoints in kilometers.
-        }
-        // if distance from UMD is less than ten miles (20km), true. else false
-        return (haversine(locationPoint, translateToGeoPoint("University Of Maryland")) < 20.0)
-    }
-
-    suspend fun submitMeal(mealName:String, locationName: String, rating: Int) {
-        val geoPoint = translateToGeoPoint(locationName)
-        if (!isInCollegePark(geoPoint)) {
-            Toast.makeText(context, "Location could not be parsed. Please check for typos and try again.", Toast.LENGTH_SHORT).show()
-            return
-        }
-        // so if the location already exists in our database, fine! if not, we should add it.
         val meal = hashMapOf(
             "mealName" to mealName,
-            "location" to locationName,
+            "locationName" to locationName,
             "rating" to rating
         )
         db.collection("Meals")
             .add(meal)
             .addOnCompleteListener {
                 if(it.isSuccessful) {
-
+                    Toast.makeText(context, "Submission complete!", Toast.LENGTH_SHORT).show()
+                    onNavigateHome()
                 }
                 else {
                     Toast.makeText(context, "Error submitting: " + it.exception?.message, Toast.LENGTH_SHORT).show()
@@ -280,7 +187,6 @@ fun SubmitScreen(
         val mealName = remember { mutableStateOf(TextFieldValue()) }
         val mealLocation = remember { mutableStateOf(TextFieldValue()) }
         val rating = remember { mutableStateOf(0f) }
-        val isVegan = remember { mutableStateOf(true) }
         Spacer(modifier = Modifier.height(80.dp))
         TextField(
             label = { Text(text = "What did you eat?") },
@@ -314,8 +220,8 @@ fun SubmitScreen(
             onClick = {
                 runBlocking {
                     submitMeal(
-                        mealName.value.toString(),
-                        mealLocation.value.toString(),
+                        mealName.value.text,
+                        mealLocation.value.text,
                         rating.value.toInt()
                     )
                 }
@@ -330,30 +236,78 @@ fun SubmitScreen(
 }
 
 @Composable
-fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
-    var mealList = ArrayList<Meal>()
+fun ListScreen(
+    db: FirebaseFirestore,
+    toastContext: Context,
+    filter: MutableState<Boolean>,
+    filterGreaterThan: MutableState<Float>
+) {
+    val mealList = ArrayList<Meal>()
     suspend fun getProductsFromFirestore() {
-        db.collection("Meals").get().addOnCompleteListener {
-            if (it.isSuccessful) {
-                for (document in it.result) {
-                    val loc = document.data["location"].toString().trim()
-                    val name = document.data["name"].toString().trim()
-                    val rating = document.data["rating"]
+        val result = db.collection("Meals")
+                        .whereGreaterThanOrEqualTo("rating", if (filter.value) filterGreaterThan.value.toLong() else 0.toLong())
+                        .get()
+                        .await()
+        try {
+            for (document in result) {
+                val loc = document.data["locationName"].toString().trim()
+                val name = document.data["mealName"].toString().trim()
+                val rating: Long = document.data["rating"] as Long
+                val newMeal = Meal(loc, name, rating)
+                mealList.add(newMeal)
+                Log.e("NEW MEAL ADDED", mealList.toString())
+            }
+        }
+        catch (E: java.lang.Exception) {
+            Toast.makeText(toastContext, "Error in retrieving data from server", Toast.LENGTH_LONG).show()
+        }
 
-                    val newMeal = Meal(loc, name, rating as Float)
-                    mealList.add(newMeal)
+    }
+    runBlocking { getProductsFromFirestore() }
 
-
-
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.LightGray),
+    ){
+        LazyColumn {
+            item {
+                Card(shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier
+                        .padding(
+                            start = 0.dp,
+                            end = 0.dp,
+                            top = 2.dp,
+                            bottom = 4.dp
+                        )
+                        .fillMaxWidth()
+                        .height(40.dp),
+                    elevation = 3.dp,
+                    border = BorderStroke(0.75.dp, color = Color.Black),
+                    backgroundColor = Color.LightGray
+                ) {
+                    Row(modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(all = 12.dp)) {
+                        Text(
+                            text = "Food / Rating",
+                            modifier = Modifier
+                                .fillMaxWidth(0.80f)
+                                .wrapContentWidth(Alignment.Start),
+                            color = Color.DarkGray,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = "Location",
+                            color = Color.DarkGray,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Justify
+                        )
+                    }
                 }
             }
-        }.await()
-    }
-    val meals = mealList
-    meals?.let {
-        LazyColumn {
             items(
-                items = meals
+                items = mealList
             ) { meal ->
                 MealCard(meal = meal)
             }
@@ -362,7 +316,9 @@ fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
 }
 
 @Composable
-fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentActivity, onNavigateToMap: () -> Unit) {
+fun SignupScreen(auth: FirebaseAuth,
+                 context: Context,
+                 onNavigateToMap: () -> Unit) {
     Column(
         modifier = Modifier.padding(20.dp),
         verticalArrangement = Arrangement.Center,
@@ -371,7 +327,6 @@ fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentA
 
         val email = remember { mutableStateOf(TextFieldValue()) }
         val password = remember { mutableStateOf(TextFieldValue()) }
-        val vegan = remember { mutableStateOf(false) }
         Text(text = "Sign Up", style = TextStyle(fontSize = 40.sp))
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -387,11 +342,6 @@ fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentA
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             onValueChange = { password.value = it })
-
-        Spacer(modifier = Modifier.height(20.dp))
-        Text(modifier = Modifier.align(Alignment.CenterHorizontally), text = "Vegan?")
-        Switch(modifier = Modifier.align(Alignment.CenterHorizontally), checked = vegan.value, onCheckedChange = {vegan.value = it})
-
         Spacer(modifier = Modifier.height(20.dp))
         Box(modifier = Modifier.padding(40.dp, 0.dp, 40.dp, 0.dp)) {
             Button(
@@ -435,7 +385,10 @@ fun ForgotPasswordScreen(auth: FirebaseAuth, context: Context) {
         Spacer(modifier = Modifier.height(60.dp))
         Button(
             modifier = Modifier.align(Alignment.CenterHorizontally),
-            onClick = {auth.sendPasswordResetEmail(email.value.text.trim())},
+            onClick = {
+                auth.sendPasswordResetEmail(email.value.text.trim())
+                Toast.makeText(context, "Password reset email sent!", Toast.LENGTH_SHORT).show()
+                      },
             colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
         ) {
             Text(text = "Send reset email", color = Color.White)
@@ -449,10 +402,10 @@ fun LoginScreen(
     onNavigateToForgotPass: () -> Unit,
     onNavigateToSignup: () -> Unit,
     auth: FirebaseAuth,
-    context: Context,
-    onNavigateToMap: () -> Unit,
+    onNavigateHome: () -> Unit,
+    context: Context
 
-) {
+    ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Button(onClick = onNavigateToSignup,
             colors = ButtonDefaults.buttonColors(backgroundColor = Color.White),
@@ -469,11 +422,11 @@ fun LoginScreen(
         val email = remember { mutableStateOf(TextFieldValue()) }
         val password = remember { mutableStateOf(TextFieldValue()) }
 
-        Text(text = "Login Or Sign Up", style = TextStyle(fontSize = 40.sp))
+        Text(text = "Login or Sign Up", style = TextStyle(fontSize = 40.sp))
 
         Spacer(modifier = Modifier.height(20.dp))
         TextField(
-            label = { Text(text = "Username") },
+            label = { Text(text = "Email Address") },
             value = email.value,
             onValueChange = { email.value = it })
 
@@ -495,7 +448,7 @@ fun LoginScreen(
                     ).addOnCompleteListener {
                         if(it.isSuccessful) {
                             //redirect to map, login-successful toast message
-                            onNavigateToMap()
+                            onNavigateHome()
                             Toast.makeText(context, "Login successful!", Toast.LENGTH_LONG).show()
                         }
                         else {
@@ -523,24 +476,44 @@ fun LoginScreen(
 }
 
 @Composable
-fun LogoutScreen(onNavigateToMap: () -> Unit, auth: FirebaseAuth) {
+fun LogoutScreen(onNavigateToMap: () -> Unit, auth: FirebaseAuth, context: Context) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("Would you like to logout?")
-        Button(modifier = Modifier.align(Alignment.CenterHorizontally),
-            onClick = {
-                auth.signOut()
-                onNavigateToMap()
+        Image(
+            painter = painterResource(id = R.drawable.umd_gluten_free_logo),
+            contentDescription = "",
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(200.dp)
+        )
+        Text("Would you like to logout?", modifier = Modifier.align(Alignment.CenterHorizontally))
+        Spacer(modifier = Modifier.height(5.dp))
+        Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Button(
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833)),
+                onClick = {
+                    auth.signOut()
+                    Toast.makeText(context, "Logout Successful!", Toast.LENGTH_SHORT).show()
+                    onNavigateToMap()
+                }
+
+            ) {
+                Text("Yes", color = Color.White)
             }
-        ) {
-            Text("Yes")
+            Spacer(modifier = Modifier.width(15.dp))
+            Button(
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833)),
+                onClick = {
+                    onNavigateToMap()
+                }
+
+            ) {
+                Text("No", color = Color.White)
+            }
+
         }
     }
 }
-// building blocks
-@Composable
-fun Placeholder(component: String) {
-    Text(text = "$component goes here")
-}
+
 
 @Composable
 fun TopBar(onMenuClicked: () -> Unit) {
@@ -565,11 +538,12 @@ fun TopBar(onMenuClicked: () -> Unit) {
 @Composable
 fun Drawer(
     onNavigateToAcctManagement: () -> Unit,
-    onNavigateToList: () -> Unit,
     onNavigateToSubmit: () -> Unit,
-    onNavigateToMap: () -> Unit,
-    auth: FirebaseAuth
+    auth: FirebaseAuth,
+    filter: MutableState<Boolean>,
+    filterGreaterThan: MutableState<Float>
 ) {
+
     Column(
         Modifier.fillMaxSize()
     ) {
@@ -584,48 +558,78 @@ fun Drawer(
         TextButton(
             onClick = onNavigateToSubmit,
             modifier = alignToCenter.fillMaxWidth()
-        ) {Text("Submit New Meal", color=Color.Black)}
-        TextButton(
-            onClick = onNavigateToMap,
-            modifier = alignToCenter.fillMaxWidth()
-        ) {Text("Map View", color=Color.Black)}
-        TextButton(
-            onClick = onNavigateToList,
-            modifier = alignToCenter.fillMaxWidth()
-        ) {Text("List View", color=Color.Black)}
+        ) {Text(text = "\uD83C\uDF73 Submit New Meal \uD83E\uDD69",
+            color=Color.Black,
+            fontSize = 20.sp,
+            textAlign = TextAlign.Center)}
         TextButton(
             onClick = onNavigateToAcctManagement,
             modifier = alignToCenter.fillMaxWidth()
-            ) {Text( if (auth.currentUser != null) "Log out" else "Log in" , color=Color.Black)}
+            ) {Text( if (auth.currentUser != null) "\uD83D\uDC64 Log Out \uD83D\uDC64" else "\uD83D\uDC64 Log In \uD83D\uDC64" , color=Color.Black, fontSize = 17.sp)}
+        Spacer(modifier = Modifier.height(125.dp))
+        Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text(text="Filter?", modifier = Modifier.align(Alignment.CenterVertically))
+            Spacer(modifier = Modifier.width(10.dp))
+            Switch(
+                checked = filter.value,
+                onCheckedChange = {filter.value = it},
+                modifier = Modifier.align(Alignment.CenterVertically),
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color(0xFFe21833),
+                    checkedTrackColor = Color(0xFFda808c)
+                )
+            )
+
+
+
+        }
+
+        Text(text = "Show only results with a rating greater than: ", modifier = Modifier.align(Alignment.CenterHorizontally))
+        Slider(
+            value = filterGreaterThan.value,
+            onValueChange = {filterGreaterThan.value = it},
+            valueRange = 0f..5f,
+            steps = 4,
+            colors = SliderDefaults.colors(
+                thumbColor = Color.Red,
+                activeTrackColor = Color.Red
+            ),
+            modifier = Modifier.padding(60.dp, 10.dp)
+        )
     }
 }
 
 @Composable
-fun DrawerBody() {
+fun DrawerBody(
+    db: FirebaseFirestore,
+    toastContext: Context,
+    filter: MutableState<Boolean>,
+    filterGreaterThan: MutableState<Float>
+) {
     Column(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .fillMaxSize()
     ) {
-        GoogleMap(cameraPositionState = CameraPositionState(position = CameraPosition(LatLng(38.9779990, -76.9287295), 15f, 0f, 0f)))
+        ListScreen(db = db, toastContext = toastContext, filter = filter, filterGreaterThan = filterGreaterThan)
     }
 }
 
 @SuppressLint("UnusedMaterialScaffoldPaddingParameter")
 @Composable
-fun MapScreen(
+fun homeScreen(
     onNavigateToAcctManagement: () -> Unit,
-    onNavigateToList: () -> Unit,
     onNavigateToSubmit: () -> Unit,
-    onNavigateToMap: () -> Unit,
     auth: FirebaseAuth,
-    db: FirebaseFirestore
+    db: FirebaseFirestore,
+    toastContext: Context,
+    filter: MutableState<Boolean>,
+    filterGreaterThan: MutableState<Float>
 ) {
     // to set menu closed by default
     val scaffoldState = rememberScaffoldState(rememberDrawerState(DrawerValue.Closed))
     val coroutineScope = rememberCoroutineScope()
-
     // Scaffold Composable
     Scaffold(
 
@@ -650,17 +654,17 @@ fun MapScreen(
 
         // THIS COULD BE A PROBLEM >:O
         content = {
-            DrawerBody()
+            DrawerBody(db = db, toastContext = toastContext, filter = filter, filterGreaterThan = filterGreaterThan)
         },
 
         // pass the drawer
         drawerContent = {
             Drawer(
                 onNavigateToAcctManagement = onNavigateToAcctManagement,
-                onNavigateToList = onNavigateToList,
                 onNavigateToSubmit = onNavigateToSubmit,
-                onNavigateToMap = onNavigateToMap,
-                auth =  auth
+                auth =  auth,
+                filter = filter,
+                filterGreaterThan = filterGreaterThan
             )
         }
     )
