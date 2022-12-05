@@ -7,5 +7,5 @@ import java.util.*
 data class Meal(
     var location: String ?= null,
     var name: String ?= null,
-    var rating: Int
+    var rating: Float
     )

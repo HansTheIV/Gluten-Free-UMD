@@ -40,7 +40,6 @@ import com.example.umd_gluten_free.composables.ProgressBar
 import com.example.umd_gluten_free.composables.MealCard
 import com.example.umd_gluten_free.data.DataOrException
 import com.example.umd_gluten_free.data.Meal
-import com.example.umd_gluten_free.extra.MealsViewModel
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -51,31 +50,28 @@ import com.google.firebase.ktx.Firebase
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import kotlinx.coroutines.*
+import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.*
 
 
 class MainActivity : ComponentActivity() {
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var mealArrayList: ArrayList<Meal>
-    private lateinit var myAdapter: MyAdapter
     private lateinit var auth: FirebaseAuth
     private lateinit var db : FirebaseFirestore
-    private val viewModel: MealsViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         db = Firebase.firestore
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
 
         setContent {
-            val dataOrException = viewModel.data.value
+
             UMDGlutenFreeTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    AppNavHost(context = LocalContext.current, listenerOwner = this, auth = auth, db = db, viewModel = viewModel, dataOrException = dataOrException)
+                    AppNavHost(context = LocalContext.current, listenerOwner = this, auth = auth, db = db)
 
                 }
             }
@@ -92,9 +88,7 @@ fun AppNavHost(
     startDestination: String = "mapScreen",
     context: Context,
     listenerOwner: MainActivity,
-    db: FirebaseFirestore,
-    dataOrException: DataOrException<List<Meal>, Exception>,
-    viewModel: MealsViewModel
+    db: FirebaseFirestore
 ) {
     NavHost(modifier=modifier, navController=navController, startDestination=startDestination) {
         composable("accountManagement") {
@@ -111,7 +105,7 @@ fun AppNavHost(
                 )
             }
         }
-        composable("listScreen") { ListScreen(db = db, context = Dispatchers.Default, viewModel = viewModel, dataOrException = dataOrException) }
+        composable("listScreen") { ListScreen(db = db, context = Dispatchers.Default) }
         composable("submitNewFood") {
             if(auth.currentUser != null) {
                 SubmitScreen(
@@ -336,8 +330,26 @@ fun SubmitScreen(
 }
 
 @Composable
-fun ListScreen(db: FirebaseFirestore, context: CoroutineContext, viewModel: MealsViewModel, dataOrException: DataOrException<List<Meal>, Exception>) {
-    val meals = dataOrException.data
+fun ListScreen(db: FirebaseFirestore, context: CoroutineContext) {
+    var mealList = ArrayList<Meal>()
+    suspend fun getProductsFromFirestore() {
+        db.collection("Meals").get().addOnCompleteListener {
+            if (it.isSuccessful) {
+                for (document in it.result) {
+                    val loc = document.data["location"].toString().trim()
+                    val name = document.data["name"].toString().trim()
+                    val rating = document.data["rating"]
+
+                    val newMeal = Meal(loc, name, rating as Float)
+                    mealList.add(newMeal)
+
+
+
+                }
+            }
+        }.await()
+    }
+    val meals = mealList
     meals?.let {
         LazyColumn {
             items(
@@ -347,80 +359,7 @@ fun ListScreen(db: FirebaseFirestore, context: CoroutineContext, viewModel: Meal
             }
         }
     }
-
-    val e = dataOrException.e
-    e?.let {
-        Text(
-            text = e.message!!,
-            modifier = Modifier.padding(16.dp)
-        )
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ProgressBar(
-            isDisplayed = viewModel.loading.value
-        )
-    }
 }
-    /** I don't know if this is code for compose or not
-
-    recyclerView = findViewById(R.id.recyclerView)
-    recyclerView.LayoutManager = LinearLayoutManager(this)
-    recyclerView.setHasFixedSize(true)
-
-    mealArrayList = arrayListOf()
-
-    myAdapter = myAdapter(mealArrayList)
-
-    recyclerView.adapter = myAdapter
-
-    EventChangeListener()
-
-    suspend fun getLocations(): List<String> {
-        return CoroutineScope(context).async {
-            val locationData = db.collection("Locations")
-            val list = mutableListOf<String>()
-
-            locationData.get().addOnSuccessListener { documents ->
-                for (document in documents) {
-                    val restaurant = document.data["name:"].toString().trim()
-                    val coordinates = document.data["locationPoint:"].toString().trim()
-
-                }
-            }
-                .addOnFailureListener { exception ->
-                    Log.w(TAG, "Error getting documents: ", exception)
-                }
-            list
-        }.await()
-
-        //Placeholder(component = "List View")
-    }
-**/
-
-
-@Composable
-fun EventChangeListener(db: FirebaseFirestore, mealArrayList: ArrayList<Meal>) {
-    db.collection("Meals").addSnapshotListener(object: EventListener<QuerySnapshot> {
-        override fun onEvent(value: QuerySnapshot?, error: FirebaseFirestoreException?) {
-            if (error != null) {
-                Log.e("Firestore Error", error.message.toString())
-                return
-            }
-
-            for (doc: DocumentChange in value?.documentChanges!!) {
-                if (doc.type == DocumentChange.Type.ADDED) {
-                    mealArrayList.add(doc.document.toObject(Meal::class.java))
-                }
-            }
-        }
-    })
-}
-
 
 @Composable
 fun SignupScreen(auth: FirebaseAuth, context: Context, listenerOwner: ComponentActivity, onNavigateToMap: () -> Unit) {
