@@ -42,17 +42,27 @@ fun MealCard(
                         .fillMaxWidth(0.85f)
                         .wrapContentWidth(Alignment.Start),
                     color = Color.DarkGray,
-                    fontSize = 25.sp
+                    fontSize = 20.sp
                 )
             }
             meal.location?.let { location ->
                 Text(
                     text = location.toString(),
                     modifier = Modifier
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                    ,
+                    color = Color.DarkGray,
+                    fontSize = 20.sp
+                )
+            }
+            meal.rating?.let { rating ->
+                Text(
+                    text = rating.toString(),
+                    modifier = Modifier
                         .wrapContentWidth(Alignment.End)
                     ,
                     color = Color.DarkGray,
-                    fontSize = 25.sp
+                    fontSize = 20.sp
                 )
             }
         }
