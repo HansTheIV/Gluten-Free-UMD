@@ -41,9 +41,7 @@ import com.example.umd_gluten_free.composables.MealCard
 import com.example.umd_gluten_free.data.Meal
 import com.example.umd_gluten_free.ui.theme.UMDGlutenFreeTheme
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseReference
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.*
@@ -180,6 +178,7 @@ fun SubmitScreen(
             "meals/$key" to meal
         )
         db.updateChildren(childUpdates)
+        onNavigateHome()
     }
     Column(modifier = Modifier.fillMaxSize()) {
         val centered = Modifier.align(Alignment.CenterHorizontally)
@@ -244,19 +243,24 @@ fun ListScreen(
     val mealList = ArrayList<Meal>()
 
     suspend fun getProductsFromFirestore() {
-        val mealIds = db.child("Meals")
+        val mealIds = db.child("meals")
                         .get()
                         .await()
                         .getChildren()
+
+        Log.e("CHILDREN", mealIds.toString())
         try {
             for (currentMeal in mealIds) {
-                val newMeal: Meal = currentMeal.getValue(Meal::class.java)!!
+                val currentInfo = currentMeal.value as HashMap<String, Any>
+                val newMeal: Meal = Meal(currentInfo["locationName"] as String?,
+                    currentInfo["mealName"] as String?, currentInfo["rating"] as Long
+                )
                 mealList.add(newMeal)
-                Log.e("NEW MEAL ADDED", mealList.toString())
             }
         }
         catch (E: java.lang.Exception) {
-            Toast.makeText(toastContext, "Error in retrieving data from server", Toast.LENGTH_LONG).show()
+            Toast.makeText(toastContext, "Error in retrieving data from server" , Toast.LENGTH_LONG).show()
+            Log.e("CHILD ERROR", E.message.toString())
         }
 
     }
