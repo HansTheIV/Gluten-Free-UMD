@@ -110,12 +110,11 @@ fun AppNavHost(
             if(auth.currentUser != null) {
                 SubmitScreen(
                     context = context,
-                    //onNavigateToLogin = { navController.navigate("loginScreen") },
                     db = db,
                     onNavigateHome = { navController.navigate("homeScreen") }
                 )
             } else {
-                Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "You cannot submit unless you are logged in.", Toast.LENGTH_SHORT).show()
                 LoginScreen(
                     onNavigateToForgotPass = {navController.navigate("forgotPassword")},
                     onNavigateToSignup = {navController.navigate("signupScreen")},
@@ -375,14 +374,15 @@ fun SignupScreen(auth: FirebaseAuth,
 fun ForgotPasswordScreen(auth: FirebaseAuth, context: Context) {
     val email = remember { mutableStateOf(TextFieldValue()) }
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(text = "Reset your password: ", modifier = Modifier.align(Alignment.CenterHorizontally))
-        Spacer(modifier = Modifier.height(60.dp))
+        Spacer(modifier = Modifier.height(15.dp))
+        Text(text = "Reset your password: ", modifier = Modifier.align(Alignment.CenterHorizontally), fontSize = 21.sp)
+        Spacer(modifier = Modifier.height(40.dp))
         TextField(
             modifier = Modifier.align(Alignment.CenterHorizontally),
             value = email.value,
             onValueChange = {email.value = it},
-            label = {Text("email address")})
-        Spacer(modifier = Modifier.height(60.dp))
+            label = {Text("Email Address")})
+        Spacer(modifier = Modifier.height(40.dp))
         Button(
             modifier = Modifier.align(Alignment.CenterHorizontally),
             onClick = {
@@ -391,7 +391,7 @@ fun ForgotPasswordScreen(auth: FirebaseAuth, context: Context) {
                       },
             colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFe21833))
         ) {
-            Text(text = "Send reset email", color = Color.White)
+            Text(text = "Send Reset Email", color = Color.White)
         }
     }
 }
