@@ -579,12 +579,8 @@ fun Drawer(
                     checkedTrackColor = Color(0xFFda808c)
                 )
             )
-
-
-
         }
-
-        Text(text = "Show only results with a rating greater than: ", modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text(text = "Show only results with a rating of at least: ", modifier = Modifier.align(Alignment.CenterHorizontally))
         Slider(
             value = filterGreaterThan.value,
             onValueChange = {filterGreaterThan.value = it},
