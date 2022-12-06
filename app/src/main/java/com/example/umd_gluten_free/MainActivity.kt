@@ -49,15 +49,18 @@ import kotlinx.coroutines.tasks.await
 
 
 class MainActivity : ComponentActivity() {
+
     private lateinit var auth: FirebaseAuth
+
+    // Reference to the database used
     private lateinit var db : DatabaseReference
     override fun onCreate(savedInstanceState: Bundle?) {
         db = Firebase.database.reference
 
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
-        setContent {
 
+        setContent {
             UMDGlutenFreeTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
@@ -65,12 +68,10 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colors.background
                 ) {
                     AppNavHost(context = LocalContext.current, auth = auth, db = db)
-
                 }
             }
         }
     }
-
 }
 
 @Composable
@@ -147,13 +148,11 @@ fun AppNavHost(
                 filterGreaterThan = filterGreaterThan
             )
         }
-
-
     }
 }
+
 // Top level screens
 @Composable
-
 fun SubmitScreen(
     context: Context,
     db: DatabaseReference,
@@ -241,7 +240,7 @@ fun ListScreen(
 ) {
     val mealList = ArrayList<Meal>()
 
-    suspend fun getProductsFromFirestore() {
+    suspend fun getMealsFromDatabase() {
         val mealIds = db.child("meals")
                         .get()
                         .await()
@@ -249,11 +248,13 @@ fun ListScreen(
 
         Log.e("CHILDREN", mealIds.toString())
         try {
+            // For all the current meal...
             for (currentMeal in mealIds) {
                 val currentInfo = currentMeal.value as HashMap<String, Any>
                 val newMeal: Meal = Meal(currentInfo["locationName"] as String?,
                     currentInfo["mealName"] as String?, currentInfo["rating"] as Long
                 )
+                // Adds current meal to the Meal List
                 mealList.add(newMeal)
             }
         }
@@ -263,7 +264,9 @@ fun ListScreen(
         }
 
     }
-    runBlocking { getProductsFromFirestore() }
+
+    // Waits for the function's completion before creating the UI
+    runBlocking { getMealsFromDatabase() }
 
     Box(
         modifier = Modifier
@@ -371,7 +374,6 @@ fun SignupScreen(auth: FirebaseAuth,
 }
 
 @Composable
-
 fun ForgotPasswordScreen(auth: FirebaseAuth, context: Context) {
     val email = remember { mutableStateOf(TextFieldValue()) }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -397,7 +399,7 @@ fun ForgotPasswordScreen(auth: FirebaseAuth, context: Context) {
     }
 }
 
-//sub-screens
+//Sub-screens
 @Composable
 fun LoginScreen(
     onNavigateToForgotPass: () -> Unit,
@@ -515,7 +517,6 @@ fun LogoutScreen(onNavigateToMap: () -> Unit, auth: FirebaseAuth, context: Conte
     }
 }
 
-
 @Composable
 fun TopBar(onMenuClicked: () -> Unit) {
     TopAppBar(
@@ -548,8 +549,7 @@ fun Drawer(
     Column(
         Modifier.fillMaxSize()
     ) {
-        //first we want a logo or something so we can put the buttons closer to the
-        // user's fingers
+        // Creates logo to be displayed
         val alignToCenter = Modifier.align(Alignment.CenterHorizontally)
         Image(
             painter = painterResource(id = R.drawable.umd_gluten_free_logo),
@@ -581,6 +581,7 @@ fun Drawer(
                 )
             )
         }
+        // Creates the slider necessary to filter
         Text(text = "Show only results with a rating of at least: ", modifier = Modifier.align(Alignment.CenterHorizontally))
         Slider(
             value = filterGreaterThan.value,
@@ -624,16 +625,17 @@ fun homeScreen(
     filter: MutableState<Boolean>,
     filterGreaterThan: MutableState<Float>
 ) {
-    // to set menu closed by default
+    // To set menu closed by default
     val scaffoldState = rememberScaffoldState(rememberDrawerState(DrawerValue.Closed))
     val coroutineScope = rememberCoroutineScope()
+
     // Scaffold Composable
     Scaffold(
 
-        // pass the scaffold state
+        // Pass the scaffold state
         scaffoldState = scaffoldState,
         drawerGesturesEnabled = scaffoldState.drawerState.isOpen,
-        // pass the topbar we created
+        // Pass the topbar we created
         topBar = {
             TopBar(
                 // When menu is clicked open the
@@ -645,16 +647,13 @@ fun homeScreen(
                 })
         },
 
-
         // Pass the body in
         // content parameter
-
-        // THIS COULD BE A PROBLEM >:O
         content = {
             DrawerBody(db = db, toastContext = toastContext, filter = filter, filterGreaterThan = filterGreaterThan)
         },
 
-        // pass the drawer
+        // Pass the drawer
         drawerContent = {
             Drawer(
                 onNavigateToAcctManagement = onNavigateToAcctManagement,
@@ -666,4 +665,3 @@ fun homeScreen(
         }
     )
 }
-
