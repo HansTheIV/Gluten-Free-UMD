@@ -253,6 +253,7 @@ fun ListScreen(
                 val name = document.data["mealName"].toString().trim()
                 val rating: Long = document.data["rating"] as Long
                 val newMeal = Meal(loc, name, rating)
+                // Adds current meal to the persistent list
                 mealList.add(newMeal)
                 Log.e("NEW MEAL ADDED", mealList.toString())
             }
@@ -262,7 +263,9 @@ fun ListScreen(
         }
 
     }
+    // Waits for the function's completion before creating the UI
     runBlocking { getProductsFromFirestore() }
+    // otherwise there's a ton of async issues.
 
     Box(
         modifier = Modifier
@@ -396,7 +399,7 @@ fun ForgotPasswordScreen(auth: FirebaseAuth, context: Context) {
     }
 }
 
-//sub-screens
+//Sub-screens
 @Composable
 fun LoginScreen(
     onNavigateToForgotPass: () -> Unit,
@@ -495,7 +498,6 @@ fun LogoutScreen(onNavigateToMap: () -> Unit, auth: FirebaseAuth, context: Conte
                     Toast.makeText(context, "Logout Successful!", Toast.LENGTH_SHORT).show()
                     onNavigateToMap()
                 }
-
             ) {
                 Text("Yes", color = Color.White)
             }
@@ -523,13 +525,10 @@ fun TopBar(onMenuClicked: () -> Unit) {
             Icon(
                 imageVector = Icons.Default.Menu,
                 contentDescription = "Menu",
-
-                // When clicked trigger onClick
                 // Callback to trigger drawer open
                 modifier = Modifier.clickable(onClick = onMenuClicked),
                 tint = Color.White
             )
-            // A button to move map to user's location
         },
         backgroundColor = Color(0xFFe21833)
     )
@@ -547,8 +546,7 @@ fun Drawer(
     Column(
         Modifier.fillMaxSize()
     ) {
-        //first we want a logo or something so we can put the buttons closer to the
-        // user's fingers
+        //Our logo, two buttons, and then filter controls
         val alignToCenter = Modifier.align(Alignment.CenterHorizontally)
         Image(
             painter = painterResource(id = R.drawable.umd_gluten_free_logo),
@@ -579,11 +577,7 @@ fun Drawer(
                     checkedTrackColor = Color(0xFFda808c)
                 )
             )
-
-
-
         }
-
         Text(text = "Show only results with a rating greater than: ", modifier = Modifier.align(Alignment.CenterHorizontally))
         Slider(
             value = filterGreaterThan.value,
@@ -650,9 +644,6 @@ fun homeScreen(
 
 
         // Pass the body in
-        // content parameter
-
-        // THIS COULD BE A PROBLEM >:O
         content = {
             DrawerBody(db = db, toastContext = toastContext, filter = filter, filterGreaterThan = filterGreaterThan)
         },

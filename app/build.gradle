@@ -5,6 +5,12 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        debug {
+            v1SigningEnabled true
+        }
+    }
+
     compileSdk 32
 
     defaultConfig {
