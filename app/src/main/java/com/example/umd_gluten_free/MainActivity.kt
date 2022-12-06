@@ -246,16 +246,24 @@ fun ListScreen(
         val mealIds = db.child("meals")
                         .get()
                         .await()
-                        .getChildren()
+                        .children
 
-        Log.e("CHILDREN", mealIds.toString())
         try {
             for (currentMeal in mealIds) {
                 val currentInfo = currentMeal.value as HashMap<String, Any>
                 val newMeal: Meal = Meal(currentInfo["locationName"] as String?,
                     currentInfo["mealName"] as String?, currentInfo["rating"] as Long
                 )
-                mealList.add(newMeal)
+                Log.e("CHILD", newMeal.toString())
+                if(filter.value) {
+                    if(newMeal.rating >= filterGreaterThan.value) {
+                        mealList.add(newMeal)
+                    }
+                }
+                else {
+                    mealList.add(newMeal)
+                }
+
             }
         }
         catch (E: java.lang.Exception) {
@@ -586,7 +594,7 @@ fun Drawer(
 
         }
 
-        Text(text = "Show only results with a rating greater than: ", modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text(text = "Show only results with a rating of at least: ", modifier = Modifier.align(Alignment.CenterHorizontally))
         Slider(
             value = filterGreaterThan.value,
             onValueChange = {filterGreaterThan.value = it},
